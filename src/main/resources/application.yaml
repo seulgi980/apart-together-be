@@ -1,0 +1,68 @@
+# 공통 설정. 비밀 값은 여기에 적지 않는다.
+#  - 로컬(local): 프로젝트 폴더의 application-local.yaml 에서 읽는다 (git에 올리지 않는다. application-local.yaml.example 참고)
+#  - 운영(prod):  EC2의 ~/apart-together/.env -> docker compose 가 환경 변수로 넣어 준다
+spring:
+  application:
+    name: apart-together-be
+  profiles:
+    # 따로 지정하지 않으면 local. 운영에서는 compose가 SPRING_PROFILES_ACTIVE=prod 로 바꾼다.
+    default: local
+  datasource:
+    # 로컬 개발 기본값. EC2 배포 때는 DB_URL 환경 변수로 바꾼다.
+    url: ${DB_URL:jdbc:mysql://localhost:3306/apart_together?useUnicode=true&characterEncoding=UTF-8&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true}
+    username: ${DB_USERNAME:root}
+    # 비밀 값은 코드에 두지 않는다. 환경 변수로만 받는다.
+    password: ${DB_PASSWORD}
+    hikari:
+      # 잠금(SELECT ... FOR UPDATE)을 기다린 뒤에 읽는 값이 최신이어야 하므로 READ COMMITTED를 쓴다.
+      transaction-isolation: TRANSACTION_READ_COMMITTED
+  jpa:
+    open-in-view: false
+    hibernate:
+      # 테이블은 db/*.sql로 직접 만든다. 엔티티와 테이블이 어긋나면 시작할 때 알려준다.
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          # DATETIME 컬럼(생성일시 등)은 서버 시간대와 상관없이 UTC로 저장한다
+          time_zone: UTC
+  servlet:
+    multipart:
+      max-file-size: 2MB
+      max-request-size: 3MB
+
+server:
+  port: ${SERVER_PORT:8080}
+
+app:
+  # 이 서버를 브라우저에서 부르는 주소 (업로드한 프로필 사진 URL을 만들 때 쓴다)
+  public-base-url: ${APP_PUBLIC_BASE_URL:http://localhost:8080}
+  cors:
+    # 프론트 주소. 쉼표로 여러 개. 여기 적힌 주소만 허용한다.
+    allowed-origins: ${APP_FRONT_ORIGINS:http://localhost:3000}
+  jwt:
+    # HS256 서명 키. 32바이트 이상. 환경 변수로만 받는다.
+    secret: ${JWT_SECRET}
+    access-ttl: ${APP_ACCESS_TTL:15m}
+    refresh-ttl: ${APP_REFRESH_TTL:14d}
+  auth:
+    refresh-cookie:
+      name: refresh_token
+      # 재발급/로그아웃 경로에만 쿠키가 실린다
+      path: /api/auth/token
+      secure: ${APP_COOKIE_SECURE:true}
+      same-site: Lax
+  trip:
+    max-members: ${APP_MAX_MEMBERS:10}
+    max-days: ${APP_MAX_TRIP_DAYS:99}
+    pin-color-count: ${APP_PIN_COLOR_COUNT:10}
+  schedule:
+    highlight-seconds: ${APP_HIGHLIGHT_SECONDS:30}
+  chat:
+    page-size: 50
+  places:
+    # 구글 Places API 키. 비밀 값이라 환경 변수로만 받는다.
+    # 없으면 장소를 등록할 수 없다 (GOOGLE_KEY_MISSING).
+    google-api-key: ${GOOGLE_MAPS_API_KEY:}
+  upload:
+    dir: ${APP_UPLOAD_DIR:./uploads}

@@ -1,0 +1,23 @@
+spring:
+  datasource:
+    url: ${TEST_DB_URL:jdbc:mysql://localhost:3306/apart_together_test?useUnicode=true&characterEncoding=UTF-8&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true}
+    username: ${TEST_DB_USERNAME:root}
+    password: ${TEST_DB_PASSWORD:}
+  sql:
+    init:
+      mode: always
+      # 테스트를 시작할 때마다 테이블을 지우고 db/*.sql로 다시 만든다
+      schema-locations:
+        - classpath:reset.sql
+        - file:db/schema.sql
+        - file:db/constraints.sql
+        - file:db/refresh_tokens.sql
+        - file:db/places_english.sql
+app:
+  places:
+    # 테스트는 외부 서비스를 부르지 않는다
+    google-api-key: ""
+  jwt:
+    secret: test-only-secret-key-0123456789-abcdefghij
+  upload:
+    dir: ./build/test-uploads

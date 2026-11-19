@@ -1,0 +1,70 @@
+# 따로같이: MySQL + 백엔드 + 프론트 (EC2 한 대)
+#
+# - 이 파일은 EC2의 ~/apart-together/ 에 놓인다 (백엔드 저장소를 push하면 GitHub Actions가 복사한다).
+# - 비밀 값은 같은 폴더의 .env 에만 둔다. .env 는 EC2에만 있고 git에 올리지 않는다. (.env.example 참고)
+# - 바깥에서 들어오는 요청은 호스트의 nginx(80/443)만 받는다.
+#   컨테이너 포트는 127.0.0.1 에만 열어서 인터넷에서 직접 닿지 않는다. MySQL은 아예 열지 않는다.
+
+name: apart-together
+
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+    environment:
+      MYSQL_DATABASE: apart_together
+      MYSQL_USER: apart
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?.env 에 MYSQL_PASSWORD 가 필요합니다}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?.env 에 MYSQL_ROOT_PASSWORD 가 필요합니다}
+      TZ: Asia/Seoul
+    volumes:
+      - mysql-data:/var/lib/mysql
+      # 테이블 만들기. DB가 비어 있는 첫 실행 때만, 파일 이름 순서대로 실행된다.
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./db/constraints.sql:/docker-entrypoint-initdb.d/02-constraints.sql:ro
+      - ./db/refresh_tokens.sql:/docker-entrypoint-initdb.d/03-refresh_tokens.sql:ro
+      - ./db/places_english.sql:/docker-entrypoint-initdb.d/04-places_english.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+
+  backend:
+    image: ${BACKEND_IMAGE:?.env 에 BACKEND_IMAGE 가 필요합니다}
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:mysql://mysql:3306/apart_together?useUnicode=true&characterEncoding=UTF-8&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true
+      DB_USERNAME: apart
+      DB_PASSWORD: ${MYSQL_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET:?.env 에 JWT_SECRET 이 필요합니다}
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
+      APP_FRONT_ORIGINS: https://${DOMAIN:?.env 에 DOMAIN 이 필요합니다}
+      APP_PUBLIC_BASE_URL: https://${DOMAIN}
+      APP_COOKIE_SECURE: "true"
+      TZ: Asia/Seoul
+    volumes:
+      # 프로필 사진
+      - uploads:/app/uploads
+    ports:
+      - "127.0.0.1:8080:8080"
+
+  frontend:
+    image: ${FRONTEND_IMAGE:?.env 에 FRONTEND_IMAGE 가 필요합니다}
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Seoul
+    ports:
+      - "127.0.0.1:3000:3000"
+
+volumes:
+  mysql-data:
+  uploads:

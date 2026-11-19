@@ -1,0 +1,11 @@
+.git
+.github
+.gradle
+.idea
+build
+uploads
+deploy
+docs
+*.md
+.env
+application-local.yaml
