@@ -20,9 +20,20 @@ Java 17, Spring Boot 4, Spring Data JPA, MySQL 8, WebSocket(STOMP), JWT.
 
 2. 로컬 설정 파일을 만들고 실행한다. 비밀 값(DB 비밀번호, JWT 서명 키, 구글 키)은 코드에 없다.
 
+   프로젝트 폴더(`gradlew` 옆)에 `application-local.yaml` 을 만들고 아래 세 값을 채운다.
+
+   ```yaml
+   spring:
+     datasource:
+       password: ""          # 로컬 MySQL 비밀번호
+   app:
+     jwt:
+       secret: ""            # 32글자 이상 아무 문자열 (로컬 전용)
+     places:
+       google-api-key: ""    # 구글 Places API 키
+   ```
+
    ```bat
-   copy application-local.yaml.example application-local.yaml
-   rem application-local.yaml 을 열어 값을 채운 뒤
    gradlew bootRun
    ```
 

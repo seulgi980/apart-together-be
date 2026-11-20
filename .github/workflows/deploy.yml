@@ -1,0 +1,141 @@
+# main(또는 master) 브랜치에 push하면: 테스트 -> 도커 이미지 빌드 -> EC2에 배포
+# (이 파일이 GitHub Actions 설정이다. 지우면 push해도 자동 배포가 돌지 않는다.)
+#
+# 저장소 Settings > Secrets and variables > Actions 에 넣어 둘 값 (Secrets):
+#   EC2_HOST     EC2 주소 (도메인 또는 IP)
+#   EC2_USER     접속 계정 (우분투면 ubuntu)
+#   EC2_SSH_KEY  배포용 SSH 개인 키 전체 내용 (-----BEGIN ... END----- 포함)
+#
+# DB 비밀번호, JWT 키, 구글 키는 여기에 넣지 않는다. EC2의 ~/apart-together/.env 에만 있다.
+
+name: deploy-backend
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+# 배포가 겹치지 않게 한 번에 하나만 돌린다
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: ci-test-only
+          MYSQL_DATABASE: apart_together_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pci-test-only --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+      - name: 테스트
+        env:
+          # 이 MySQL은 테스트가 끝나면 사라지는 일회용이다
+          TEST_DB_URL: jdbc:mysql://127.0.0.1:3306/apart_together_test?useUnicode=true&characterEncoding=UTF-8&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&allowPublicKeyRetrieval=true&useSSL=false
+          TEST_DB_USERNAME: root
+          TEST_DB_PASSWORD: ci-test-only
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon test
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 이미지 이름 정하기 (소문자)
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/apart-together-be" >> "$GITHUB_ENV"
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: 이미지 빌드해서 올리기
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: SSH 준비
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$EC2_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$EC2_HOST" >> ~/.ssh/known_hosts
+
+      - name: compose 파일, nginx 설정, 테이블 SQL 복사
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+        run: |
+          ssh -i ~/.ssh/deploy_key "$EC2_USER@$EC2_HOST" 'mkdir -p ~/apart-together/db'
+          scp -i ~/.ssh/deploy_key deploy/docker-compose.yml deploy/nginx/apart-together.conf "$EC2_USER@$EC2_HOST:~/apart-together/"
+          scp -i ~/.ssh/deploy_key db/schema.sql db/constraints.sql db/refresh_tokens.sql db/places_english.sql "$EC2_USER@$EC2_HOST:~/apart-together/db/"
+
+      - name: 새 이미지로 다시 띄우기
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # 이미지 받기용 토큰은 이 작업이 끝나면 만료된다. 표준 입력으로만 넘기고 EC2에 남기지 않는다.
+          printf '%s' "$GHCR_TOKEN" | ssh -i ~/.ssh/deploy_key "$EC2_USER@$EC2_HOST" "
+            set -e
+            cd ~/apart-together
+            test -f .env || { echo '~/apart-together/.env 가 없습니다. deploy/README.md 6번을 보고 만들어 주세요.'; exit 1; }
+            docker login ghcr.io -u '$GHCR_USER' --password-stdin
+            docker compose pull backend
+            docker compose up -d mysql backend
+            docker logout ghcr.io
+            docker image prune -f
+          "
+
+      - name: 서버가 떴는지 확인
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+        run: |
+          ssh -i ~/.ssh/deploy_key "$EC2_USER@$EC2_HOST" '
+            for i in $(seq 1 30); do
+              if curl -fsS http://127.0.0.1:8080/api/config > /dev/null; then echo "백엔드 정상"; exit 0; fi
+              sleep 5
+            done
+            echo "백엔드가 뜨지 않았습니다. 마지막 로그:"
+            cd ~/apart-together && docker compose logs --tail 80 backend
+            exit 1
+          '

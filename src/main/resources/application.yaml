@@ -1,5 +1,5 @@
 # 공통 설정. 비밀 값은 여기에 적지 않는다.
-#  - 로컬(local): 프로젝트 폴더의 application-local.yaml 에서 읽는다 (git에 올리지 않는다. application-local.yaml.example 참고)
+#  - 로컬(local): 프로젝트 폴더의 application-local.yaml 에서 읽는다 (git에 올리지 않는다. 양식은 README.md)
 #  - 운영(prod):  EC2의 ~/apart-together/.env -> docker compose 가 환경 변수로 넣어 준다
 spring:
   application:
