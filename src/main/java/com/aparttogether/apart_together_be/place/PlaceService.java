@@ -10,6 +10,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.aparttogether.apart_together_be.chat.ChatService;
 import com.aparttogether.apart_together_be.common.ApiException;
 import com.aparttogether.apart_together_be.common.ErrorCode;
 import com.aparttogether.apart_together_be.place.PlaceDtos.CreatePlaceRequest;
@@ -25,6 +26,7 @@ import com.aparttogether.apart_together_be.schedule.ScheduleRepository;
 import com.aparttogether.apart_together_be.trip.MembershipGuard;
 import com.aparttogether.apart_together_be.trip.TripMember;
 import com.aparttogether.apart_together_be.trip.TripMemberRepository;
+import com.aparttogether.apart_together_be.user.UserRepository;
 
 @Service
 public class PlaceService {
@@ -39,6 +41,8 @@ public class PlaceService {
 	private final TripEvents events;
 	private final ScheduleEvents scheduleEvents;
 	private final GooglePlacesClient google;
+	private final ChatService chat;
+	private final UserRepository users;
 
 	/**
 	 * 상세 패널 위쪽 3칸(평점, 영업시간, 웹사이트).
@@ -49,7 +53,8 @@ public class PlaceService {
 
 	public PlaceService(PlaceRepository places, PlaceReferenceRepository references, PlaceVoteRepository votes,
 			TripMemberRepository members, ScheduleRepository schedules, ScheduleItemRepository scheduleItems,
-			MembershipGuard guard, TripEvents events, ScheduleEvents scheduleEvents, GooglePlacesClient google) {
+			MembershipGuard guard, TripEvents events, ScheduleEvents scheduleEvents, GooglePlacesClient google,
+			ChatService chat, UserRepository users) {
 		this.places = places;
 		this.references = references;
 		this.votes = votes;
@@ -60,6 +65,8 @@ public class PlaceService {
 		this.events = events;
 		this.scheduleEvents = scheduleEvents;
 		this.google = google;
+		this.chat = chat;
+		this.users = users;
 	}
 
 	/**
@@ -96,6 +103,11 @@ public class PlaceService {
 
 	/* ───────── 등록 / 수정 / 삭제 ───────── */
 
+	/**
+	 * 카드를 등록하고 채팅에 "OO님이 XX 장소 카드를 추가했습니다." 알림을 남긴다.
+	 * 이벤트는 커밋 뒤에 등록한 순서대로 나가므로, 방 사람들은 알림(CHAT_MESSAGE)을 받은 다음에 카드(PLACE_UPSERTED)를 받는다.
+	 * 알림에는 카드 ID(sharedPlaceId)를 실어, 화면이 "이 카드의 알림이 도착했는지"를 알 수 있게 한다.
+	 */
 	@Transactional
 	public PlaceResponse create(Long userId, Long tripId, CreatePlaceRequest request) {
 		guard.requireActive(tripId, userId);
@@ -103,6 +115,8 @@ public class PlaceService {
 		if (place == null) {
 			throw new ApiException(ErrorCode.PLACE_DUPLICATE);
 		}
+		String nickname = users.findById(userId).map(user -> user.getNickname()).orElse("알 수 없음");
+		chat.postSystem(tripId, userId, nickname + "님이 " + place.getName() + " 장소 카드를 추가했습니다.", place.getId());
 		PlaceResponse response = toResponse(place);
 		publishUpsert(place, userId, response);
 		return response;

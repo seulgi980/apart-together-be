@@ -569,7 +569,7 @@ class ScheduleTest extends IntegrationTest {
 	/* ───────── [채팅] 시스템 메시지 ───────── */
 
 	@Test
-	@DisplayName("[채팅] 시스템 메시지는 공동 일정이 바뀔 때만 남긴다 (추가, 시간 변경, Day 이동, 제외)")
+	@DisplayName("[채팅] 시스템 메시지는 장소 카드 등록과 공동 일정 변경(추가, 시간 변경, Day 이동, 제외) 때 남긴다")
 	void 채팅_공동일정이_바뀌면_시스템메시지를_남긴다() {
 		long placeId = addPlace(jieun, tripId, "g-osaka", "오사카성");
 		long item = addPlaceItem(jieun, "shared", 3, placeId, "13:00", "15:00").body().get("id").asLong();
@@ -581,6 +581,7 @@ class ScheduleTest extends IntegrationTest {
 		patch(jieun, item, TestApi.json("memo", "입장권 예매"));
 
 		assertThat(chatTexts()).containsExactly(
+				"지은님이 오사카성 장소 카드를 추가했습니다.",
 				"지은님이 Day 3 13:00~15:00에 오사카성을 추가했습니다.",
 				"지은님이 Day 1에 숙소 체크인을 추가했습니다.",
 				"민수님이 Day 3 오사카성의 시간을 14:00~15:00(으)로 바꿨습니다.",
@@ -588,7 +589,7 @@ class ScheduleTest extends IntegrationTest {
 				"지은님이 Day 1에서 숙소 체크인을 제외했습니다.");
 		assertThat(jdbc.queryForObject(
 				"select count(*) from chat_messages where message_type = 'SYSTEM' and sender_user_id is null",
-				Integer.class)).isEqualTo(5);
+				Integer.class)).isEqualTo(6);
 	}
 
 	@Test

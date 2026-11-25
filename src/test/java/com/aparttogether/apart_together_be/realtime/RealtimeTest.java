@@ -137,6 +137,11 @@ class RealtimeTest extends IntegrationTest {
 			var forMinsu = b.subscribeTrip(tripId);
 
 			long placeId = addPlace(jieun, tripId, "g-sensoji", "센소지");
+			// 카드 등록 알림(CHAT_MESSAGE)이 카드(PLACE_UPSERTED)보다 먼저 온다
+			JsonNode first = forMinsu.await("CHAT_MESSAGE");
+			assertThat(first).as("카드 등록 알림").isNotNull();
+			assertThat(first.get("payload").get("kind").asString()).isEqualTo("SYSTEM");
+			assertThat(first.get("payload").get("sharedPlaceId").asLong()).isEqualTo(placeId);
 			JsonNode upserted = forMinsu.await("PLACE_UPSERTED");
 			assertThat(upserted.get("payload").get("name").asString()).isEqualTo("센소지");
 

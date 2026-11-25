@@ -96,8 +96,29 @@ class ChatTest extends IntegrationTest {
 				.isEqualTo("SHARE_NOT_ALLOWED");
 		assertThat(code(api.post(minsu.token(), chat + "/messages", TestApi.json("sharedPlaceId", otherPlace))))
 				.isEqualTo("SHARE_NOT_ALLOWED");
+		// 카드 등록 알림 1개 + 공유 1개. 거절된 공유는 남지 않는다
 		assertThat(jdbc.queryForObject("select count(*) from chat_messages where trip_id = ?", Integer.class, tripId))
-				.isEqualTo(1);
+				.isEqualTo(2);
+	}
+
+	@Test
+	@DisplayName("[채팅] 장소 카드를 등록하면 'OO님이 XX 장소 카드를 추가했습니다.' 시스템 메시지가 그 카드 ID와 함께 남는다")
+	void 채팅_카드등록_알림() {
+		long placeId = addPlace(jieun, tripId, "g-sensoji", "센소지");
+
+		JsonNode messages = api.get(minsu.token(), chat + "/messages").body().get("messages");
+		assertThat(messages).hasSize(1);
+		JsonNode notice = messages.get(0);
+		assertThat(notice.get("kind").asString()).isEqualTo("SYSTEM");
+		assertThat(notice.get("senderUserId").isNull()).isTrue();
+		assertThat(notice.get("content").asString()).isEqualTo("지은님이 센소지 장소 카드를 추가했습니다.");
+		assertThat(notice.get("sharedPlaceId").asLong()).isEqualTo(placeId);
+		// 등록한 사람이 아닌 멤버에게는 안 읽은 메시지로 센다
+		assertThat(api.get(minsu.token(), chat + "/unread").body().get("unreadCount").asLong()).isEqualTo(1);
+
+		// 중복 등록으로 거절되면 알림도 남지 않는다
+		api.post(minsu.token(), "/api/trips/" + tripId + "/places", placeBody("g-sensoji", "센소지"));
+		assertThat(api.get(minsu.token(), chat + "/messages").body().get("messages")).hasSize(1);
 	}
 
 	@Test
@@ -107,7 +128,11 @@ class ChatTest extends IntegrationTest {
 		api.post(jieun.token(), chat + "/messages", TestApi.json("sharedPlaceId", shared));
 		api.delete(jieun.token(), "/api/trips/" + tripId + "/places/" + shared);
 
-		JsonNode message = api.get(minsu.token(), chat + "/messages").body().get("messages").get(0);
+		JsonNode messages = api.get(minsu.token(), chat + "/messages").body().get("messages");
+		// [0] 카드 등록 알림, [1] 공유 메시지. 둘 다 카드 ID가 비고, 알림 글은 그대로 남는다
+		assertThat(messages.get(0).get("kind").asString()).isEqualTo("SYSTEM");
+		assertThat(messages.get(0).get("sharedPlaceId").isNull()).isTrue();
+		JsonNode message = messages.get(1);
 		assertThat(message.get("kind").asString()).isEqualTo("PLACE");
 		assertThat(message.get("sharedPlaceId").isNull()).isTrue();
 	}

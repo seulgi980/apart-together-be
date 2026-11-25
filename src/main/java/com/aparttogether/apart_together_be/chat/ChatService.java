@@ -26,7 +26,7 @@ public class ChatService {
 	private static final int MAX_PAGE_SIZE = 100;
 
 	/**
-	 * @param kind            USER(일반 메시지) / SYSTEM(공동 일정 변경 자동 기록) / PLACE(장소 카드 공유)
+	 * @param kind            USER(일반 메시지) / SYSTEM(공동 일정 변경, 장소 카드 등록 자동 기록) / PLACE(장소 카드 공유)
 	 * @param senderUserId    보낸 회원. SYSTEM은 null
 	 * @param sharedPlaceId   kind가 PLACE일 때 공유한 카드. 카드가 삭제됐으면 null ("삭제된 장소 카드")
 	 */
@@ -94,14 +94,24 @@ public class ChatService {
 	}
 
 	/**
-	 * [채팅] 시스템 메시지. 공동 일정이 바뀔 때만 남긴다. (호출하는 쪽이 공동 일정인지 확인한다)
-	 * 일정 변경과 같은 트랜잭션 안에서 저장되므로, 거절된 요청은 기록되지 않는다.
+	 * [채팅] 시스템 메시지. 공동 일정이 바뀔 때와 장소 카드를 등록할 때 남긴다. (호출하는 쪽이 판단한다)
+	 * 변경과 같은 트랜잭션 안에서 저장되므로, 거절된 요청은 기록되지 않는다.
 	 */
 	@Transactional
 	public void postSystem(Long tripId, Long actorUserId, String text) {
+		postSystem(tripId, actorUserId, text, null);
+	}
+
+	/**
+	 * @param placeId 이 알림이 가리키는 장소 카드 (카드 등록 알림). 화면은 이 알림을 받은 뒤에야
+	 *                그 카드를 채팅 [+] 목록에 보여준다. 카드가 지워지면 FK가 NULL로 비운다.
+	 */
+	@Transactional
+	public void postSystem(Long tripId, Long actorUserId, String text, Long placeId) {
 		ChatMessage message = new ChatMessage();
 		message.setTripId(tripId);
 		message.setMessageType(ChatMessage.MessageType.SYSTEM);
+		message.setSharedPlaceId(placeId);
 		message.setContent(text.length() > MAX_CONTENT_LENGTH ? text.substring(0, MAX_CONTENT_LENGTH) : text);
 		// 이벤트에는 일정을 바꾼 사람을 실어, 그 사람의 화면에서는 안 읽은 메시지로 세지 않게 한다
 		saveAndPublish(message, actorUserId);

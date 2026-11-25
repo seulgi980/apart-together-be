@@ -144,7 +144,7 @@ Place = {
 |---|---|---|---|---|
 | POST | `/api/places/resolve` | `{ url }` | `{ placeKey, name, nameEn, address, addressEn, area, latitude, longitude, googleMapsUrl, category }` | `NOT_GOOGLE_MAPS_URL`, `PLACE_RESOLVE_FAILED`, `GOOGLE_KEY_MISSING` |
 | GET | `/api/trips/{tripId}/places` | | `Place[]` | |
-| POST | `/api/trips/{tripId}/places` | `{ placeKey, name, nameEn?, address?, addressEn?, area?, latitude?, longitude?, googleMapsUrl, category, memo? }` | 201 `Place` | `PLACE_DUPLICATE`, `NOT_GOOGLE_MAPS_URL` |
+| POST | `/api/trips/{tripId}/places` | `{ placeKey, name, nameEn?, address?, addressEn?, area?, latitude?, longitude?, googleMapsUrl, category, memo? }` | 201 `Place` (채팅에 등록 알림도 남긴다) | `PLACE_DUPLICATE`, `NOT_GOOGLE_MAPS_URL` |
 | GET | `/api/trips/{tripId}/places/{placeId}` | | `Place` | `PLACE_NOT_FOUND` |
 | GET | `/api/trips/{tripId}/places/{placeId}/google-info` | | `{ available, info: { rating, websiteUrl, weekdayHours[] } }` | `PLACE_NOT_FOUND` |
 | PATCH | `/api/trips/{tripId}/places/{placeId}` | `{ name, category, memo }` | `Place` | |
@@ -205,7 +205,9 @@ ScheduleItem = {
 ```json
 ChatMessage = { "id": 55, "tripId": 1, "kind": "USER", "senderUserId": 2, "content": "안녕", "sharedPlaceId": null, "createdAt": "..." }
 ```
-- `kind`: `USER`(일반) / `SYSTEM`(공동 일정 변경 기록, `senderUserId` = null) / `PLACE`(장소 카드 공유, `content`는 빈 문자열).
+- `kind`: `USER`(일반) / `SYSTEM`(공동 일정 변경, 장소 카드 등록 기록, `senderUserId` = null) / `PLACE`(장소 카드 공유, `content`는 빈 문자열).
+- 장소 카드 등록 알림(`SYSTEM`)은 `"OO님이 XX 장소 카드를 추가했습니다."`이고 `sharedPlaceId`에 그 카드 ID가 실린다. 이벤트는 알림(`CHAT_MESSAGE`)이 카드(`PLACE_UPSERTED`)보다 먼저 온다.
+  화면은 이 알림을 받은 카드만 채팅 [+] 목록에 보여준다. (카드가 채팅 알림보다 먼저 공유되지 않게)
 - `kind`가 `PLACE`인데 `sharedPlaceId`가 null이면 카드가 삭제된 것이다("삭제된 장소 카드").
 
 | 메서드 | 경로 | 요청 | 응답 | 오류 |
