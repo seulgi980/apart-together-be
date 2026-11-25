@@ -67,6 +67,7 @@ ALTER TABLE chat_messages
   );
 
 -- 공동 카드는 dedupe_owner_id가 0, 나만 카드는 등록자 ID와 같아야 한다.
+-- (나만 카드를 없애면서 shared_cards_redesign.sql이 이 CHECK와 두 컬럼을 지운다)
 ALTER TABLE places
   ADD CONSTRAINT ck_places_dedupe CHECK (
     (visibility = 'SHARED'  AND dedupe_owner_id = 0)
@@ -87,8 +88,8 @@ ALTER TABLE schedule_items
 -- [권한]
 --  * 모든 조회/수정 API는 먼저 요청자가 해당 여행방의 ACTIVE 멤버인지 확인한다. (F1-5)
 --    (FK가 users를 가리키므로 DB만으로는 "이 방의 참여자인지"를 알 수 없다)
---  * 나만(PRIVATE) 카드는 등록자 본인에게만 조회/수정/삭제를 허용한다. (F2-9)
---    단, 개인 일정에 배치된 항목의 장소명/카테고리는 일정을 보는 멤버에게 보인다.
+--  * 장소 카드는 모두 방의 멤버 모두가 함께 쓴다. 누가 등록했든 멤버라면 조회/수정/삭제/투표할 수 있다.
+--    (나만 카드는 shared_cards_redesign.sql에서 없앴다)
 --  * 다른 멤버의 개인 일정은 읽기 전용이다. (F4-2)
 --
 -- [여행 기간]
@@ -104,8 +105,7 @@ ALTER TABLE schedule_items
 --    서비스가 개수를 세서 막고, uq_schedule_items_place (schedule_id, place_key, place_slot) 유니크가
 --    같은 번호가 두 번 들어가는 것을 막는다. 위반 시 거절 메시지로 변환한다. (db/schedule_items_lodging_slot.sql)
 --  * 일정 항목을 만들 때 place_key는 places.place_key를 복사해서 넣는다. (메모 항목은 NULL)
---  * 공동 일정에는 공동(SHARED) 카드만 넣을 수 있다.
---    나만(PRIVATE) 카드는 투표 대상이 아니지만, 그 카드 주인의 개인 일정에는 넣을 수 있다.
+--  * 방의 카드는 공동 일정, 개인 일정 어디에든 넣을 수 있다. 다른 방의 카드는 넣을 수 없다.
 --
 -- [타임라인 순서] (schedule_items.anchor_minute, sort_order)
 --  * 화면은 "이 Day의 항목을 이 순서로"라고 항목 ID 목록을 보낸다. (틈에 끼워 넣기, 시간 미정 항목 옮기기)
@@ -140,22 +140,19 @@ ALTER TABLE schedule_items
 --  * 개인 일정(scope=PERSONAL, owner_key=주인 ID)은 멤버가 방에 참여할 때 만든다. 이미 있으면 다시 만들지 않는다.
 --
 -- [투표]
---  * 투표는 공동(SHARED) 카드에만 허용한다. 나만 카드에는 투표 행을 만들지 않는다.
---  * 나만 카드를 "공동으로 올릴" 때 visibility=SHARED, dedupe_owner_id=0으로 함께 바꾼다.
---    이미 같은 장소의 공동 카드가 있으면 유니크 위반 -> "이미 공동카드로 등록되어 있습니다" 안내. (F2-10)
---  * 공동 카드를 나만 카드로 되돌릴 수 없다. (F2-10)
+--  * 모든 카드에 투표할 수 있다. 한 사람은 카드마다 LIKE/PASS 중 하나만 (uq_place_votes_place_user).
+--  * 공동 일정의 장소 풀에는 패스된 카드가 나오지 않고, 개인 일정의 장소 풀에는 모든 카드가 나온다. (화면 규칙)
 --
 -- [채팅]
 --  * 시스템 메시지는 공동 일정이 바뀔 때만 남긴다. 개인 일정의 변경은 채팅에 남기지 않는다.
---  * 장소 카드 공유(shared_place_id)는 같은 여행방의 공동(SHARED) 카드만 허용한다.
+--  * 장소 카드 공유(shared_place_id)는 같은 여행방의 카드만 허용한다.
 --
 -- [멤버 나가기/내보내기] (F1-11)
 --  * 한 트랜잭션 안에서 처리한다.
 --    1) trip_members: status를 LEFT/KICKED로, pin_color_no를 NULL로, left_at을 현재 시각으로
 --    2) 그 사용자가 이 여행방에서 한 place_votes 삭제 (이 방의 카드에 대한 투표만)
 --    3) 그 사용자의 개인 일정(schedules, PERSONAL)과 그 안의 항목 삭제
---    4) 그 사용자의 나만(PRIVATE) 카드 삭제 (연결된 참고자료, 일정 항목은 CASCADE)
---  * 공동 카드, 참고자료, 채팅은 남긴다. 화면에는 "탈퇴한 멤버"로 표시한다.
+--  * 장소 카드, 참고자료, 채팅은 남긴다. 화면에는 "탈퇴한 멤버"로 표시한다.
 --
 -- [재참여]
 --  * 나갔던(LEFT) 사람이 초대코드로 다시 들어오면 trip_members에 새 행을 만들지 않는다.
@@ -164,10 +161,10 @@ ALTER TABLE schedule_items
 --    joined_at은 다시 들어온 시각으로 바꾼다.
 --  * 내보내진(KICKED) 사람은 다시 들어올 수 없다. 초대코드로 참여를 시도하면 거절한다.
 --    (참여 처리에서 trip_members에 status=KICKED 행이 있는지 먼저 확인한다)
---  * 다시 들어오면 예전에 남긴 공동 카드, 참고자료, 채팅은 따로 손대지 않아도 다시 닉네임으로 보인다.
+--  * 다시 들어오면 예전에 남긴 장소 카드, 참고자료, 채팅은 따로 손대지 않아도 다시 닉네임으로 보인다.
 --    이 기록들은 user_id를 그대로 갖고 있고, "탈퇴한 멤버" 표시는 저장된 값이 아니라
 --    조회할 때 trip_members.status가 ACTIVE가 아니면 그렇게 보여 주는 것이기 때문이다.
---  * 나갈 때 지운 것(투표, 개인 일정, 나만 카드)은 되살아나지 않는다. 새로 시작한다.
+--  * 나갈 때 지운 것(투표, 개인 일정)은 되살아나지 않는다. 새로 시작한다.
 --  * 안 읽은 채팅 수는 last_read_chat_id를 다시 들어온 시점의 마지막 메시지로 맞춰 0부터 센다.
 --
 -- [인원 제한]

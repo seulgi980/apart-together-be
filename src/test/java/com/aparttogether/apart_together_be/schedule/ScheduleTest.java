@@ -135,16 +135,14 @@ class ScheduleTest extends IntegrationTest {
 	}
 
 	@Test
-	@DisplayName("[권한] 나만 카드를 개인 일정에 배치하면 그 항목의 장소명/카테고리는 일정을 보는 멤버에게 보인다")
-	void 권한_개인일정에_넣은_나만카드의_장소명은_보인다() {
-		long secret = addPlace(jieun, tripId, "g-ramen", "비밀 라멘집", "PRIVATE");
-		assertThat(addPlaceItem(jieun, String.valueOf(jieun.id()), 1, secret, null, null).status()).isEqualTo(201);
+	@DisplayName("[권한] 다른 멤버의 개인 일정에 넣은 항목도 장소명/카테고리가 함께 보인다")
+	void 권한_개인일정_항목의_장소명은_보인다() {
+		long ramen = addPlace(jieun, tripId, "g-ramen", "라멘집");
+		assertThat(addPlaceItem(jieun, String.valueOf(jieun.id()), 1, ramen, null, null).status()).isEqualTo(201);
 
 		JsonNode item = api.get(minsu.token(), trip + "/schedule-items").body().get(0);
-		assertThat(item.get("placeName").asString()).isEqualTo("비밀 라멘집");
+		assertThat(item.get("placeName").asString()).isEqualTo("라멘집");
 		assertThat(item.get("placeCategory").asString()).isEqualTo("SIGHTSEEING");
-		// 카드 자체는 여전히 열 수 없다
-		assertThat(code(api.get(minsu.token(), trip + "/places/" + secret))).isEqualTo("PLACE_NOT_FOUND");
 	}
 
 	@Test
@@ -251,10 +249,9 @@ class ScheduleTest extends IntegrationTest {
 	}
 
 	@Test
-	@DisplayName("[일정 검증] 중복 배치: 같은 장소는 한 일정에 한 번만. 다른 Day, 다른 카드(공동/나만)여도 같은 장소면 거절한다 (F4-20)")
+	@DisplayName("[일정 검증] 중복 배치: 같은 장소는 한 일정에 한 번만. 다른 Day여도 거절한다 (F4-20)")
 	void 일정검증_중복배치를_거절한다() {
-		long shared = addPlace(jieun, tripId, "g-sensoji", "센소지", "SHARED");
-		long mine = addPlace(jieun, tripId, "g-sensoji", "센소지", "PRIVATE");
+		long shared = addPlace(jieun, tripId, "g-sensoji", "센소지");
 		String personal = String.valueOf(jieun.id());
 		assertThat(addPlaceItem(jieun, "shared", 3, shared, "13:00", null).status()).isEqualTo(201);
 
@@ -265,8 +262,8 @@ class ScheduleTest extends IntegrationTest {
 		assertThat(rejected.body().get("conflict").get("dayNo").asInt()).isEqualTo(3);
 		assertThat(rejected.body().get("conflict").get("startTime").asString()).isEqualTo("13:00");
 
-		// 개인 일정은 별개의 일정이라 넣을 수 있다. 하지만 같은 장소의 다른 카드는 중복이다.
-		assertThat(addPlaceItem(jieun, personal, 1, mine, null, null).status()).isEqualTo(201);
+		// 개인 일정은 별개의 일정이라 넣을 수 있다. 그 안에서는 다시 중복이다.
+		assertThat(addPlaceItem(jieun, personal, 1, shared, null, null).status()).isEqualTo(201);
 		assertThat(code(addPlaceItem(jieun, personal, 2, shared, null, null))).isEqualTo("SCHEDULE_DUPLICATE");
 		// 거절된 요청은 채팅에 기록하지 않는다 (F6-5)
 		assertThat(chatTexts()).hasSize(1);
@@ -276,7 +273,7 @@ class ScheduleTest extends IntegrationTest {
 	@DisplayName("[일정 검증] 숙소는 체크인/체크아웃 때문에 한 일정에 2번까지 배치할 수 있고, 3번째는 거절한다 (F4-20)")
 	void 일정검증_숙소는_두번까지_배치한다() {
 		TestApi.Response created = api.post(jieun.token(), "/api/trips/" + tripId + "/places",
-				placeBody("g-hotel", "아사쿠사 호텔", "SHARED").put("category", "LODGING"));
+				placeBody("g-hotel", "아사쿠사 호텔").put("category", "LODGING"));
 		assertThat(created.status()).isEqualTo(201);
 		long hotel = created.body().get("id").asLong();
 
@@ -298,7 +295,7 @@ class ScheduleTest extends IntegrationTest {
 	@Test
 	@DisplayName("[일정 검증] 일정 항목을 만들 때 place_key는 places.place_key를 복사해서 넣는다. 메모 항목은 NULL")
 	void 일정검증_place_key를_복사한다() {
-		long placeId = addPlace(jieun, tripId, "g-sensoji", "센소지", "SHARED");
+		long placeId = addPlace(jieun, tripId, "g-sensoji", "센소지");
 		long placeItem = addPlaceItem(jieun, "shared", 1, placeId, null, null).body().get("id").asLong();
 		long memoItem = memo(1, "숙소 체크인", null, null);
 
@@ -313,15 +310,18 @@ class ScheduleTest extends IntegrationTest {
 	}
 
 	@Test
-	@DisplayName("[일정 검증] 공동 일정에는 공동(SHARED) 카드만 넣을 수 있다. 나만 카드는 그 카드 주인의 개인 일정에만 넣을 수 있다")
-	void 일정검증_공동일정에는_공동카드만() {
-		long mine = addPlace(jieun, tripId, "g-ramen", "라멘집", "PRIVATE");
+	@DisplayName("[일정 검증] 방의 카드는 누가 등록했든 공동 일정, 개인 일정 어디에든 넣을 수 있다. 다른 방 카드는 넣을 수 없다")
+	void 일정검증_방의_카드는_어느_일정에든_넣는다() {
+		long ramen = addPlace(jieun, tripId, "g-ramen", "라멘집");
 
-		assertThat(code(addPlaceItem(jieun, "shared", 1, mine, null, null))).isEqualTo("SCHEDULE_PLACE_NOT_ALLOWED");
-		assertThat(addPlaceItem(jieun, String.valueOf(jieun.id()), 1, mine, null, null).status()).isEqualTo(201);
-		// 남의 나만 카드는 내 개인 일정에도 넣을 수 없다 (볼 수 없는 카드)
-		assertThat(code(addPlaceItem(minsu, String.valueOf(minsu.id()), 1, mine, null, null)))
-				.isEqualTo("PLACE_NOT_FOUND");
+		assertThat(addPlaceItem(jieun, "shared", 1, ramen, null, null).status()).isEqualTo(201);
+		assertThat(addPlaceItem(jieun, String.valueOf(jieun.id()), 1, ramen, null, null).status()).isEqualTo(201);
+		// 지은이 등록한 카드를 민수가 자기 개인 일정에 넣을 수 있다
+		assertThat(addPlaceItem(minsu, String.valueOf(minsu.id()), 1, ramen, null, null).status()).isEqualTo(201);
+
+		long otherTrip = createTrip(minsu);
+		long otherPlace = addPlace(minsu, otherTrip, "g-other", "다른 방 장소");
+		assertThat(code(addPlaceItem(minsu, "shared", 1, otherPlace, null, null))).isEqualTo("PLACE_NOT_FOUND");
 	}
 
 	@Test
@@ -595,7 +595,7 @@ class ScheduleTest extends IntegrationTest {
 	@Test
 	@DisplayName("[채팅] 시스템 메시지는 공동 일정이 바뀔 때만 남긴다 (추가, 시간 변경, Day 이동, 제외)")
 	void 채팅_공동일정이_바뀌면_시스템메시지를_남긴다() {
-		long placeId = addPlace(jieun, tripId, "g-osaka", "오사카성", "SHARED");
+		long placeId = addPlace(jieun, tripId, "g-osaka", "오사카성");
 		long item = addPlaceItem(jieun, "shared", 3, placeId, "13:00", "15:00").body().get("id").asLong();
 		long checkin = memo(1, "숙소 체크인", null, null);
 		patch(minsu, item, time("14:00", "15:00"));
@@ -630,7 +630,7 @@ class ScheduleTest extends IntegrationTest {
 	@Test
 	@DisplayName("장소 카드를 삭제하면 일정에 배치된 항목도 함께 제거된다 (F2-6)")
 	void placeDeleteRemovesItems() {
-		long placeId = addPlace(jieun, tripId, "g-osaka", "오사카성", "SHARED");
+		long placeId = addPlace(jieun, tripId, "g-osaka", "오사카성");
 		addPlaceItem(jieun, "shared", 3, placeId, null, null);
 		addPlaceItem(minsu, String.valueOf(minsu.id()), 1, placeId, null, null);
 

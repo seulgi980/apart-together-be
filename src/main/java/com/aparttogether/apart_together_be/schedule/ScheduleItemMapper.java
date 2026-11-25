@@ -22,7 +22,7 @@ public class ScheduleItemMapper {
 	 * @param scope         SHARED(공동 일정) / PERSONAL(개인 일정)
 	 * @param ownerUserId   개인 일정의 주인. 공동 일정은 null
 	 * @param kind          PLACE(장소 항목) / MEMO(메모 항목)
-	 * @param placeName     장소명. 남의 나만 카드여도 일정을 보는 멤버에게 보인다 (F2-9)
+	 * @param placeName     장소명 (카드가 지워졌으면 null)
 	 * @param startTime     "HH:mm". null이면 시간 미정
 	 * @param anchorMinute  시간 미정 항목의 자리. -1 = 맨 위, null = 맨 아래
 	 * @param lastChangedAt 하이라이트 기준 시각

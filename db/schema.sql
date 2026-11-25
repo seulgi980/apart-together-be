@@ -20,6 +20,14 @@
 --     - anchor_minute, sort_order 추가 (시간 미정 항목이 타임라인 안에서 놓인 자리)
 --     - last_changed_at 추가 (하이라이트 기준 시각. updated_at으로 판단하지 않는다)
 --     - last_change_type 값 변경: UPDATED -> TIME_CHANGED, EDITED
+--
+-- 이 파일 이후의 변경 (운영 DB가 이미 있어서 ALTER 파일로 쌓는다. 순서대로 실행)
+--  * constraints.sql            : CHECK 제약
+--  * refresh_tokens.sql         : refresh token 테이블
+--  * places_english.sql         : places.name_en, address_en
+--  * schedule_items_lodging_slot.sql : schedule_items.place_slot (숙소 2번 배치. 다음 파일에서 다시 지움)
+--  * shared_cards_redesign.sql  : 나만 카드 없앰(places.visibility, dedupe_owner_id 삭제, 같은 장소는 방마다 1장)
+--  아래 테이블 설명 중 나만 카드(PRIVATE), dedupe_owner_id 이야기는 v3 당시 기준이다.
 -- ============================================================
 
 -- ------------------------------------------------------------

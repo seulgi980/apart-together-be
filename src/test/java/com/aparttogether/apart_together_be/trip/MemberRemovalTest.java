@@ -20,9 +20,9 @@ class MemberRemovalTest extends IntegrationTest {
 	private String trip;
 	private long sharedByJieun;
 	private long sharedByMinsu;
-	private long privateOfMinsu;
+	private long ramenByMinsu;
 
-	/** 민수가 투표, 공동 카드, 참고자료, 나만 카드, 개인 일정, 공동 일정 항목, 채팅을 남긴 상태 */
+	/** 민수가 투표, 장소 카드, 참고자료, 개인 일정, 공동 일정 항목, 채팅을 남긴 상태 */
 	@BeforeEach
 	void setUp() {
 		jieun = signup("지은");
@@ -31,15 +31,15 @@ class MemberRemovalTest extends IntegrationTest {
 		joinTrip(jieun, tripId, minsu);
 		trip = "/api/trips/" + tripId;
 
-		sharedByJieun = addPlace(jieun, tripId, "g-sensoji", "센소지", "SHARED");
-		sharedByMinsu = addPlace(minsu, tripId, "g-tsukiji", "츠키지 시장", "SHARED");
-		privateOfMinsu = addPlace(minsu, tripId, "g-ramen", "라멘집", "PRIVATE");
+		sharedByJieun = addPlace(jieun, tripId, "g-sensoji", "센소지");
+		sharedByMinsu = addPlace(minsu, tripId, "g-tsukiji", "츠키지 시장");
+		ramenByMinsu = addPlace(minsu, tripId, "g-ramen", "라멘집");
 		api.put(minsu.token(), trip + "/places/" + sharedByJieun + "/vote", TestApi.json("vote", "PASS"));
 		api.put(jieun.token(), trip + "/places/" + sharedByJieun + "/vote", TestApi.json("vote", "LIKE"));
 		api.post(minsu.token(), trip + "/places/" + sharedByJieun + "/references",
 				TestApi.json("url", "https://blog.naver.com/a/1", "title", "민수가 찾은 글"));
 		String personal = trip + "/schedules/" + minsu.id() + "/items";
-		api.post(minsu.token(), personal, TestApi.json("dayNo", 1, "placeId", privateOfMinsu));
+		api.post(minsu.token(), personal, TestApi.json("dayNo", 1, "placeId", ramenByMinsu));
 		api.post(minsu.token(), personal, TestApi.json("dayNo", 2, "title", "혼자 쇼핑"));
 		api.post(minsu.token(), trip + "/schedules/shared/items", TestApi.json("dayNo", 1, "placeId", sharedByMinsu));
 		api.post(minsu.token(), trip + "/chat/messages", TestApi.json("content", "민수의 채팅"));
@@ -54,13 +54,9 @@ class MemberRemovalTest extends IntegrationTest {
 		// 3) 개인 일정과 그 안의 항목 삭제
 		assertThat(jdbc.queryForObject("select count(*) from schedules where trip_id = ? and owner_key = ?",
 				Integer.class, tripId, minsu.id())).isZero();
-		// 4) 나만 카드 삭제
-		assertThat(jdbc.queryForObject("select count(*) from places where id = ?", Integer.class, privateOfMinsu))
-				.isZero();
-
-		// 공동 카드, 참고자료, 채팅, 공동 일정 항목은 남긴다
-		assertThat(jdbc.queryForObject("select count(*) from places where id = ?", Integer.class, sharedByMinsu))
-				.isEqualTo(1);
+		// 장소 카드(개인 일정에만 넣었던 카드도), 참고자료, 채팅, 공동 일정 항목은 남긴다
+		assertThat(jdbc.queryForObject("select count(*) from places where id in (?, ?)", Integer.class,
+				sharedByMinsu, ramenByMinsu)).isEqualTo(2);
 		assertThat(jdbc.queryForObject("select count(*) from place_references where added_by_user_id = ?",
 				Integer.class, minsu.id())).isEqualTo(1);
 		assertThat(jdbc.queryForObject("select count(*) from chat_messages where sender_user_id = ?", Integer.class,
@@ -74,8 +70,8 @@ class MemberRemovalTest extends IntegrationTest {
 	}
 
 	@Test
-	@DisplayName("[멤버 나가기/내보내기] 나가면 그 사람의 투표, 개인 일정, 나만 카드만 삭제하고 공동 카드/참고자료/채팅은 남긴다 (F1-11)")
-	void 멤버나가기_투표_개인일정_나만카드만_삭제한다() {
+	@DisplayName("[멤버 나가기/내보내기] 나가면 그 사람의 투표, 개인 일정만 삭제하고 장소 카드/참고자료/채팅은 남긴다 (F1-11)")
+	void 멤버나가기_투표_개인일정만_삭제한다() {
 		assertThat(api.post(minsu.token(), trip + "/leave", null).status()).isEqualTo(204);
 		assertMinsuDataRemoved();
 		assertThat(jdbc.queryForObject("select status from trip_members where trip_id = ? and user_id = ?",
@@ -96,8 +92,8 @@ class MemberRemovalTest extends IntegrationTest {
 	void 멤버나가기_다른방의_데이터는_그대로다() {
 		long other = createTrip(jieun, "2027-01-01", "2027-01-03");
 		joinTrip(jieun, other, minsu);
-		long otherShared = addPlace(jieun, other, "g-x", "다른 방 장소", "SHARED");
-		long otherPrivate = addPlace(minsu, other, "g-y", "다른 방 나만", "PRIVATE");
+		long otherShared = addPlace(jieun, other, "g-x", "다른 방 장소");
+		long otherByMinsu = addPlace(minsu, other, "g-y", "다른 방 민수 카드");
 		api.put(minsu.token(), "/api/trips/" + other + "/places/" + otherShared + "/vote",
 				TestApi.json("vote", "LIKE"));
 
@@ -105,22 +101,20 @@ class MemberRemovalTest extends IntegrationTest {
 
 		assertThat(jdbc.queryForObject("select count(*) from place_votes where user_id = ?", Integer.class,
 				minsu.id())).isEqualTo(1);
-		assertThat(jdbc.queryForObject("select count(*) from places where id = ?", Integer.class, otherPrivate))
+		assertThat(jdbc.queryForObject("select count(*) from places where id = ?", Integer.class, otherByMinsu))
 				.isEqualTo(1);
 		assertThat(jdbc.queryForObject("select count(*) from schedules where trip_id = ? and owner_key = ?",
 				Integer.class, other, minsu.id())).isEqualTo(1);
 	}
 
 	@Test
-	@DisplayName("[재참여] 다시 들어와도 나갈 때 지운 것(투표, 개인 일정 항목, 나만 카드)은 되살아나지 않고, 남긴 공동 카드/채팅은 그대로 자기 것이다")
+	@DisplayName("[재참여] 다시 들어와도 나갈 때 지운 것(투표, 개인 일정 항목)은 되살아나지 않고, 남긴 장소 카드/채팅은 그대로 자기 것이다")
 	void 재참여_지운것은_되살아나지_않는다() {
 		api.post(minsu.token(), trip + "/leave", null);
 		assertThat(join(minsu, inviteCode(jieun, tripId)).body().get("status").asString()).isEqualTo("JOINED");
 
 		assertThat(jdbc.queryForObject("select count(*) from place_votes where user_id = ?", Integer.class,
 				minsu.id())).isZero();
-		assertThat(jdbc.queryForObject("select count(*) from places where trip_id = ? and visibility = 'PRIVATE'",
-				Integer.class, tripId)).isZero();
 		// 개인 일정은 새로 만들어졌지만 비어 있다
 		assertThat(jdbc.queryForObject("""
 				select count(*) from schedule_items i join schedules s on s.id = i.schedule_id

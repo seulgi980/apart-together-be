@@ -69,7 +69,7 @@ public class PlaceService {
 	@Transactional(readOnly = true)
 	public GoogleInfoResponse googleInfo(Long userId, Long tripId, Long placeId) {
 		guard.requireActive(tripId, userId);
-		Place place = findVisible(userId, tripId, placeId);
+		Place place = findPlace(tripId, placeId);
 		if (!google.isEnabled()) {
 			return new GoogleInfoResponse(false, GooglePlacesClient.PlaceInfo.empty());
 		}
@@ -81,17 +81,17 @@ public class PlaceService {
 
 	/* ───────── 조회 ───────── */
 
-	/** 내가 볼 수 있는 카드만 돌려준다: 공동 카드 전체 + 내 나만 카드 (F2-9) */
+	/** 방의 카드 전체. 모든 카드는 멤버 모두가 함께 본다. */
 	@Transactional(readOnly = true)
 	public List<PlaceResponse> list(Long userId, Long tripId) {
 		guard.requireActive(tripId, userId);
-		return toResponses(tripId, places.findVisible(tripId, userId));
+		return toResponses(tripId, places.findByTripIdOrderByNameAscIdAsc(tripId));
 	}
 
 	@Transactional(readOnly = true)
 	public PlaceResponse get(Long userId, Long tripId, Long placeId) {
 		guard.requireActive(tripId, userId);
-		return toResponse(findVisible(userId, tripId, placeId));
+		return toResponse(findPlace(tripId, placeId));
 	}
 
 	/* ───────── 등록 / 수정 / 삭제 ───────── */
@@ -108,11 +108,9 @@ public class PlaceService {
 		return response;
 	}
 
-
 	/**
-	 * 같은 장소는 같은 공개 범위 안에서 중복 등록할 수 없다 (F2-3).
-	 * 공동 카드는 dedupe_owner_id = 0, 나만 카드는 등록자 ID로 넣어 (trip_id, place_key, dedupe_owner_id) 유니크가 막는다.
-	 * 중복이면 null.
+	 * 방마다 같은 장소는 1장만 등록할 수 있다 (F2-3). 등록자가 달라도 중복이다.
+	 * (trip_id, place_key) 유니크가 동시에 들어온 요청도 막는다. 중복이면 null.
 	 */
 	private Place insert(Long userId, Long tripId, CreatePlaceRequest request) {
 		if (!GoogleMapsUrls.isGoogleMapsUrl(request.googleMapsUrl())) {
@@ -121,17 +119,13 @@ public class PlaceService {
 		if ((request.latitude() == null) != (request.longitude() == null)) {
 			throw new ApiException(ErrorCode.VALIDATION_FAILED, "위도와 경도는 함께 있어야 합니다.");
 		}
-		Place.Visibility visibility = request.visibility() == null ? Place.Visibility.SHARED : request.visibility();
-		Long dedupeOwnerId = visibility == Place.Visibility.SHARED ? 0L : userId;
 		String placeKey = request.placeKey().trim();
-		if (places.existsByTripIdAndPlaceKeyAndDedupeOwnerId(tripId, placeKey, dedupeOwnerId)) {
+		if (places.existsByTripIdAndPlaceKey(tripId, placeKey)) {
 			return null;
 		}
 		Place place = new Place();
 		place.setTripId(tripId);
 		place.setCreatedByUserId(userId);
-		place.setVisibility(visibility);
-		place.setDedupeOwnerId(dedupeOwnerId);
 		place.setPlaceKey(placeKey);
 		place.setName(request.name().trim());
 		place.setNameEn(blankToNull(request.nameEn()));
@@ -146,7 +140,7 @@ public class PlaceService {
 		try {
 			return places.saveAndFlush(place);
 		} catch (DataIntegrityViolationException e) {
-			// 동시에 같은 장소를 등록한 경우: uq_places_dedupe 유니크가 막는다
+			// 동시에 같은 장소를 등록한 경우: uq_places_trip_place 유니크가 막는다
 			throw new ApiException(ErrorCode.PLACE_DUPLICATE);
 		}
 	}
@@ -155,7 +149,7 @@ public class PlaceService {
 	public PlaceResponse update(Long userId, Long tripId, Long placeId, String name, Place.Category category,
 			String memo) {
 		guard.requireActive(tripId, userId);
-		Place place = findVisible(userId, tripId, placeId);
+		Place place = findPlace(tripId, placeId);
 		place.setName(name.trim());
 		place.setCategory(category);
 		place.setMemo(blankToNull(memo));
@@ -174,18 +168,15 @@ public class PlaceService {
 	@Transactional
 	public void delete(Long userId, Long tripId, Long placeId) {
 		guard.requireActive(tripId, userId);
-		Place place = findVisible(userId, tripId, placeId);
-		boolean shared = place.isShared();
+		findPlace(tripId, placeId);
 		List<ScheduleItem> placed = scheduleItems.findByPlaceId(placeId);
 		List<Long> removedItemIds = placed.stream().map(ScheduleItem::getId).toList();
 		places.deleteOne(placeId);
 
-		if (shared) {
-			Map<String, Object> payload = new LinkedHashMap<>();
-			payload.put("placeId", placeId);
-			payload.put("removedItemIds", removedItemIds);
-			events.publish(TripEvent.Type.PLACE_DELETED, tripId, userId, payload);
-		}
+		Map<String, Object> payload = new LinkedHashMap<>();
+		payload.put("placeId", placeId);
+		payload.put("removedItemIds", removedItemIds);
+		events.publish(TripEvent.Type.PLACE_DELETED, tripId, userId, payload);
 		if (!placed.isEmpty()) {
 			scheduleEvents.removed(schedules.findByTripId(tripId), userId, placed);
 		}
@@ -193,14 +184,11 @@ public class PlaceService {
 
 	/* ───────── 투표 ───────── */
 
-	/** [투표] 공동(SHARED) 카드에만 허용한다. 나만 카드에는 투표 행을 만들지 않는다. */
+	/** [투표] 모든 카드에 투표할 수 있다. type이 null이면 내 투표를 취소한다. */
 	@Transactional
 	public PlaceResponse vote(Long userId, Long tripId, Long placeId, PlaceVote.VoteType type) {
 		guard.requireActive(tripId, userId);
-		Place place = findVisible(userId, tripId, placeId);
-		if (!place.isShared()) {
-			throw new ApiException(ErrorCode.VOTE_NOT_ALLOWED);
-		}
+		findPlace(tripId, placeId);
 		if (type == null) {
 			votes.deleteByPlaceIdAndUserId(placeId, userId);
 		} else {
@@ -226,38 +214,12 @@ public class PlaceService {
 		return toResponse(places.findById(placeId).orElseThrow());
 	}
 
-	/**
-	 * 공동으로 올리기 (F2-10). visibility=SHARED, dedupe_owner_id=0으로 함께 바꾼다.
-	 * 이미 같은 장소의 공동 카드가 있으면 PLACE_ALREADY_SHARED. 공동 카드를 나만 카드로 되돌리는 API는 없다.
-	 */
-	@Transactional
-	public PlaceResponse promote(Long userId, Long tripId, Long placeId) {
-		guard.requireActive(tripId, userId);
-		Place place = findVisible(userId, tripId, placeId);
-		if (place.isShared()) {
-			return toResponse(place);
-		}
-		if (places.existsByTripIdAndPlaceKeyAndDedupeOwnerId(tripId, place.getPlaceKey(), 0L)) {
-			throw new ApiException(ErrorCode.PLACE_ALREADY_SHARED);
-		}
-		place.setVisibility(Place.Visibility.SHARED);
-		place.setDedupeOwnerId(0L);
-		try {
-			places.saveAndFlush(place);
-		} catch (DataIntegrityViolationException e) {
-			throw new ApiException(ErrorCode.PLACE_ALREADY_SHARED);
-		}
-		PlaceResponse response = toResponse(place);
-		publishUpsert(place, userId, response);
-		return response;
-	}
-
 	/* ───────── 참고자료 ───────── */
 
 	@Transactional
 	public PlaceResponse addReference(Long userId, Long tripId, Long placeId, ReferenceRequest request) {
 		guard.requireActive(tripId, userId);
-		Place place = findVisible(userId, tripId, placeId);
+		Place place = findPlace(tripId, placeId);
 		PlaceReference reference = new PlaceReference();
 		reference.setPlaceId(placeId);
 		reference.setAddedByUserId(userId);
@@ -270,7 +232,7 @@ public class PlaceService {
 	public PlaceResponse updateReference(Long userId, Long tripId, Long placeId, Long referenceId,
 			ReferenceRequest request) {
 		guard.requireActive(tripId, userId);
-		Place place = findVisible(userId, tripId, placeId);
+		Place place = findPlace(tripId, placeId);
 		PlaceReference reference = references.findByIdAndPlaceId(referenceId, placeId)
 				.orElseThrow(() -> new ApiException(ErrorCode.REFERENCE_NOT_FOUND));
 		apply(reference, request);
@@ -281,7 +243,7 @@ public class PlaceService {
 	@Transactional
 	public PlaceResponse deleteReference(Long userId, Long tripId, Long placeId, Long referenceId) {
 		guard.requireActive(tripId, userId);
-		Place place = findVisible(userId, tripId, placeId);
+		Place place = findPlace(tripId, placeId);
 		PlaceReference reference = references.findByIdAndPlaceId(referenceId, placeId)
 				.orElseThrow(() -> new ApiException(ErrorCode.REFERENCE_NOT_FOUND));
 		references.delete(reference);
@@ -301,10 +263,9 @@ public class PlaceService {
 
 	/* ───────── 내부 ───────── */
 
-	/** [권한] 나만(PRIVATE) 카드는 등록자 본인에게만 조회/수정/삭제를 허용한다. 남에게는 없는 카드처럼 보인다. */
-	private Place findVisible(Long userId, Long tripId, Long placeId) {
+	/** 이 방의 카드. 다른 방의 카드는 없는 카드처럼 보인다. */
+	private Place findPlace(Long tripId, Long placeId) {
 		return places.findByIdAndTripId(placeId, tripId)
-				.filter(place -> place.isVisibleTo(userId))
 				.orElseThrow(() -> new ApiException(ErrorCode.PLACE_NOT_FOUND));
 	}
 
@@ -314,11 +275,8 @@ public class PlaceService {
 		return response;
 	}
 
-	/** 나만 카드의 변경은 방에 뿌리지 않는다 (다른 멤버가 볼 수 없는 카드) */
 	private void publishUpsert(Place place, Long userId, PlaceResponse response) {
-		if (place.isShared()) {
-			events.publish(TripEvent.Type.PLACE_UPSERTED, place.getTripId(), userId, response);
-		}
+		events.publish(TripEvent.Type.PLACE_UPSERTED, place.getTripId(), userId, response);
 	}
 
 	private PlaceResponse toResponse(Place place) {
@@ -344,7 +302,7 @@ public class PlaceService {
 				.map(place -> new PlaceResponse(place.getId(), place.getTripId(), place.getPlaceKey(),
 						place.getName(), place.getNameEn(), place.getAddress(), place.getAddressEn(), place.getArea(), place.getLatitude(),
 						place.getLongitude(), place.getGoogleMapsUrl(), place.getCategory().name(), place.getMemo(),
-						place.getVisibility().name(), place.getCreatedByUserId(),
+						place.getCreatedByUserId(),
 						votesByPlace.getOrDefault(place.getId(), Map.of()),
 						referencesByPlace.getOrDefault(place.getId(), List.of()), place.getCreatedAt()))
 				.toList();

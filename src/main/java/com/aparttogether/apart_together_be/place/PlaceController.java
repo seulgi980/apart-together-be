@@ -45,7 +45,6 @@ public class PlaceController {
 		return ResponseEntity.status(HttpStatus.CREATED).body(placeService.create(auth.id(), tripId, request));
 	}
 
-
 	@GetMapping("/{placeId}")
 	public PlaceResponse get(@AuthenticationPrincipal AuthUser auth, @PathVariable Long tripId,
 			@PathVariable Long placeId) {
@@ -82,12 +81,6 @@ public class PlaceController {
 	public PlaceResponse cancelVote(@AuthenticationPrincipal AuthUser auth, @PathVariable Long tripId,
 			@PathVariable Long placeId) {
 		return placeService.vote(auth.id(), tripId, placeId, null);
-	}
-
-	@PostMapping("/{placeId}/promote")
-	public PlaceResponse promote(@AuthenticationPrincipal AuthUser auth, @PathVariable Long tripId,
-			@PathVariable Long placeId) {
-		return placeService.promote(auth.id(), tripId, placeId);
 	}
 
 	@PostMapping("/{placeId}/references")

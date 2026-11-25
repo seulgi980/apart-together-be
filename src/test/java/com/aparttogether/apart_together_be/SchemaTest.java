@@ -14,7 +14,7 @@ import com.aparttogether.apart_together_be.support.IntegrationTest;
 class SchemaTest extends IntegrationTest {
 
 	@Test
-	@DisplayName("CHECK 14개(constraints.sql 1부 9개 + 2부 4개 + schedule_items_lodging_slot.sql 1개)가 모두 적용된다")
+	@DisplayName("CHECK 13개(constraints.sql 1부 9개 + 2부 3개 + schedule_items_lodging_slot.sql 1개)가 모두 적용된다. ck_places_dedupe는 shared_cards_redesign.sql에서 지웠다")
 	void allChecksApplied() {
 		List<String> checks = jdbc.queryForList("""
 				select constraint_name from information_schema.table_constraints
@@ -25,7 +25,7 @@ class SchemaTest extends IntegrationTest {
 				"ck_places_lat", "ck_places_lng", "ck_places_geo",
 				"ck_schedule_items_day", "ck_schedule_items_time", "ck_schedule_items_anchor",
 				// 2부: 3823 오류 없이 적용됨
-				"ck_schedules_owner", "ck_chat_messages_sender", "ck_places_dedupe", "ck_schedule_items_kind",
+				"ck_schedules_owner", "ck_chat_messages_sender", "ck_schedule_items_kind",
 				// db/schedule_items_lodging_slot.sql: 숙소는 2번까지 배치 (place_slot 1, 2)
 				"ck_schedule_items_place_slot");
 	}

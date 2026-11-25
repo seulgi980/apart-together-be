@@ -20,7 +20,6 @@ import com.aparttogether.apart_together_be.common.ApiException;
 import com.aparttogether.apart_together_be.common.ErrorCode;
 import com.aparttogether.apart_together_be.common.Times;
 import com.aparttogether.apart_together_be.config.AppProperties;
-import com.aparttogether.apart_together_be.place.PlaceRepository;
 import com.aparttogether.apart_together_be.place.PlaceVoteRepository;
 import com.aparttogether.apart_together_be.realtime.PresenceStore;
 import com.aparttogether.apart_together_be.realtime.TripEvent;
@@ -48,7 +47,6 @@ public class TripService {
 	private final UserRepository users;
 	private final ScheduleRepository schedules;
 	private final ScheduleItemRepository scheduleItems;
-	private final PlaceRepository places;
 	private final PlaceVoteRepository votes;
 	private final ChatMessageRepository chats;
 	private final MembershipGuard guard;
@@ -58,7 +56,7 @@ public class TripService {
 	private final SecureRandom random = new SecureRandom();
 
 	public TripService(TripRepository trips, TripMemberRepository members, UserRepository users,
-			ScheduleRepository schedules, ScheduleItemRepository scheduleItems, PlaceRepository places,
+			ScheduleRepository schedules, ScheduleItemRepository scheduleItems,
 			PlaceVoteRepository votes, ChatMessageRepository chats, MembershipGuard guard, TripEvents events,
 			PresenceStore presence, AppProperties properties) {
 		this.trips = trips;
@@ -66,7 +64,6 @@ public class TripService {
 		this.users = users;
 		this.schedules = schedules;
 		this.scheduleItems = scheduleItems;
-		this.places = places;
 		this.votes = votes;
 		this.chats = chats;
 		this.guard = guard;
@@ -267,13 +264,11 @@ public class TripService {
 	 *  1) trip_members: status를 LEFT/KICKED로, pin_color_no를 NULL로, left_at을 현재 시각으로
 	 *  2) 그 사용자가 이 방의 카드에 한 투표 삭제
 	 *  3) 그 사용자의 개인 일정과 그 안의 항목 삭제
-	 *  4) 그 사용자의 나만 카드 삭제 (참고자료, 일정 항목은 CASCADE)
-	 * 공동 카드, 참고자료, 채팅은 남긴다.
+	 * 장소 카드, 참고자료, 채팅은 남긴다.
 	 */
 	private void removeMember(Long tripId, Long targetUserId, Long actorUserId, TripMember.Status status) {
 		votes.deleteByUserInTrip(tripId, targetUserId);
 		schedules.deleteByTripIdAndOwnerKey(tripId, targetUserId);
-		places.deletePrivateOf(tripId, targetUserId);
 
 		TripMember member = members.findByTripIdAndUserId(tripId, targetUserId).orElseThrow();
 		member.setStatus(status);

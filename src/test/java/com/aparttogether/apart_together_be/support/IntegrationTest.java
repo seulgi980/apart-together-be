@@ -85,19 +85,18 @@ public abstract class IntegrationTest {
 		}
 	}
 
-	/** 장소 카드를 등록하고 ID를 돌려준다. visibility: SHARED / PRIVATE */
-	protected long addPlace(Member member, long tripId, String placeKey, String name, String visibility) {
+	/** 장소 카드를 등록하고 ID를 돌려준다 */
+	protected long addPlace(Member member, long tripId, String placeKey, String name) {
 		TestApi.Response response = api.post(member.token(), "/api/trips/" + tripId + "/places",
-				placeBody(placeKey, name, visibility));
+				placeBody(placeKey, name));
 		assertThat(response.status()).as(String.valueOf(response.body())).isEqualTo(201);
 		return response.body().get("id").asLong();
 	}
 
-	protected tools.jackson.databind.node.ObjectNode placeBody(String placeKey, String name, String visibility) {
+	protected tools.jackson.databind.node.ObjectNode placeBody(String placeKey, String name) {
 		return TestApi.json("placeKey", placeKey, "name", name, "address", "도쿄 어딘가", "area", "아사쿠사",
 				"latitude", 35.7148, "longitude", 139.7967,
-				"googleMapsUrl", "https://maps.app.goo.gl/" + placeKey, "category", "SIGHTSEEING",
-				"visibility", visibility);
+				"googleMapsUrl", "https://maps.app.goo.gl/" + placeKey, "category", "SIGHTSEEING");
 	}
 
 	protected static String code(TestApi.Response response) {

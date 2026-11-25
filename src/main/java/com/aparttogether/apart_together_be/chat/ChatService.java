@@ -12,7 +12,6 @@ import org.springframework.transaction.annotation.Transactional;
 import com.aparttogether.apart_together_be.common.ApiException;
 import com.aparttogether.apart_together_be.common.ErrorCode;
 import com.aparttogether.apart_together_be.config.AppProperties;
-import com.aparttogether.apart_together_be.place.Place;
 import com.aparttogether.apart_together_be.place.PlaceRepository;
 import com.aparttogether.apart_together_be.realtime.TripEvent;
 import com.aparttogether.apart_together_be.realtime.TripEvents;
@@ -68,7 +67,7 @@ public class ChatService {
 
 	/**
 	 * 메시지 전송. WebSocket(/app/trips/{tripId}/chat)과 REST 양쪽에서 부른다.
-	 * [채팅] 장소 카드 공유(shared_place_id)는 같은 여행방의 공동(SHARED) 카드만 허용한다.
+	 * [채팅] 장소 카드 공유(shared_place_id)는 같은 여행방의 카드만 허용한다.
 	 */
 	@Transactional
 	public ChatMessageResponse send(Long userId, Long tripId, String content, Long sharedPlaceId) {
@@ -78,8 +77,7 @@ public class ChatService {
 		message.setSenderUserId(userId);
 		message.setMessageType(ChatMessage.MessageType.USER);
 		if (sharedPlaceId != null) {
-			Place place = places.findByIdAndTripId(sharedPlaceId, tripId).orElse(null);
-			if (place == null || !place.isShared()) {
+			if (places.findByIdAndTripId(sharedPlaceId, tripId).isEmpty()) {
 				throw new ApiException(ErrorCode.SHARE_NOT_ALLOWED);
 			}
 			message.setSharedPlaceId(sharedPlaceId);

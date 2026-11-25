@@ -77,7 +77,7 @@ public class ScheduleService {
 
 	/**
 	 * 방의 모든 일정 항목 (공동 + 모든 멤버의 개인 일정).
-	 * 다른 멤버의 개인 일정은 읽기 전용으로 볼 수 있고, 나만 카드로 넣은 항목도 장소명/카테고리는 보인다.
+	 * 다른 멤버의 개인 일정은 읽기 전용으로 볼 수 있다.
 	 */
 	@Transactional(readOnly = true)
 	public List<ScheduleItemResponse> list(Long userId, Long tripId) {
@@ -105,14 +105,9 @@ public class ScheduleService {
 
 		Place place = null;
 		if (request.placeId() != null) {
-			// [권한] 나만 카드는 등록자 본인만 쓸 수 있다
+			// 이 방의 카드면 공동 일정, 개인 일정 어디에든 넣을 수 있다
 			place = places.findByIdAndTripId(request.placeId(), tripId)
-					.filter(found -> found.isVisibleTo(userId))
 					.orElseThrow(() -> new ApiException(ErrorCode.PLACE_NOT_FOUND));
-			// 공동 일정에는 공동 카드만 넣을 수 있다. 나만 카드는 그 카드 주인의 개인 일정에만.
-			if (schedule.isShared() && !place.isShared()) {
-				throw new ApiException(ErrorCode.SCHEDULE_PLACE_NOT_ALLOWED);
-			}
 			// 중복 배치 검증: 기준은 카드가 아니라 장소(place_key)다 (F4-20)
 			// 숙소는 체크인/체크아웃 때문에 2번까지, 나머지는 1번만 넣을 수 있다.
 			List<ScheduleItem> placed = items.findByScheduleIdAndPlaceKey(schedule.getId(), place.getPlaceKey());

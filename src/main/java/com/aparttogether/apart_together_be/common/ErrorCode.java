@@ -33,8 +33,6 @@ public enum ErrorCode {
 	// 장소 카드
 	PLACE_NOT_FOUND(HttpStatus.NOT_FOUND, "장소 카드를 찾을 수 없습니다."),
 	PLACE_DUPLICATE(HttpStatus.CONFLICT, "이미 등록된 장소입니다."),
-	PLACE_ALREADY_SHARED(HttpStatus.CONFLICT, "이미 공동카드로 등록되어 있습니다"),
-	VOTE_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "공동 카드에만 투표할 수 있습니다."),
 	NOT_GOOGLE_MAPS_URL(HttpStatus.BAD_REQUEST, "장소는 구글맵 링크로만 등록할 수 있어요."),
 	PLACE_RESOLVE_FAILED(HttpStatus.UNPROCESSABLE_ENTITY, "링크에서 장소 정보를 가져오지 못했습니다."),
 	GOOGLE_KEY_MISSING(HttpStatus.SERVICE_UNAVAILABLE, "서버에 구글 API 키가 설정되지 않아 장소를 등록할 수 없습니다."),
@@ -48,12 +46,11 @@ public enum ErrorCode {
 	SCHEDULE_DUPLICATE(HttpStatus.CONFLICT, "해당 카드가 이미 배치되어 있습니다."),
 	SCHEDULE_GAP_MISMATCH(HttpStatus.CONFLICT, "이 자리에는 넣을 수 없는 시간이에요."),
 	SCHEDULE_ORDER_INVALID(HttpStatus.CONFLICT, "일정이 바뀌어 순서를 적용할 수 없습니다. 다시 시도해 주세요."),
-	SCHEDULE_PLACE_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "이 일정에 넣을 수 없는 카드입니다."),
 	INVALID_DAY(HttpStatus.BAD_REQUEST, "여행 기간을 벗어난 Day입니다."),
 	INVALID_TIME_RANGE(HttpStatus.BAD_REQUEST, "종료 시간은 시작 시간보다 늦어야 합니다."),
 
 	// 채팅
-	SHARE_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "공동 카드만 채팅에 올릴 수 있습니다.");
+	SHARE_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "이 여행방의 장소 카드만 채팅에 올릴 수 있습니다.");
 
 	private final HttpStatus status;
 	private final String defaultMessage;

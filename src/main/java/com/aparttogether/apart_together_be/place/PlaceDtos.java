@@ -16,7 +16,6 @@ public final class PlaceDtos {
 	private PlaceDtos() {
 	}
 
-	/** visibility를 생략하면 SHARED(공동) */
 	public record CreatePlaceRequest(
 			@NotBlank @Size(max = 200) String placeKey,
 			@NotBlank @Size(max = 200) String name,
@@ -28,8 +27,7 @@ public final class PlaceDtos {
 			@DecimalMin("-180") @DecimalMax("180") BigDecimal longitude,
 			@NotBlank @Size(max = 2048) String googleMapsUrl,
 			@NotNull Place.Category category,
-			@Size(max = 300) String memo,
-			Place.Visibility visibility) {
+			@Size(max = 300) String memo) {
 	}
 
 
@@ -73,7 +71,6 @@ public final class PlaceDtos {
 			String googleMapsUrl,
 			String category,
 			String memo,
-			String visibility,
 			Long createdByUserId,
 			Map<Long, String> votes,
 			List<ReferenceResponse> references,

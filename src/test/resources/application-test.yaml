@@ -14,6 +14,7 @@ spring:
         - file:db/refresh_tokens.sql
         - file:db/places_english.sql
         - file:db/schedule_items_lodging_slot.sql
+        - file:db/shared_cards_redesign.sql
 app:
   places:
     # 테스트는 외부 서비스를 부르지 않는다

@@ -5,7 +5,7 @@
 - 기본 주소(로컬): `http://localhost:8080`
 - 모든 요청/응답 본문은 JSON(UTF-8). ID는 숫자다.
 - 날짜 `YYYY-MM-DD`, 일정 시간 `HH:mm`(현지 시각 그대로, 시간대 변환 없음), 일시는 ISO-8601 UTC(`2026-11-18T08:30:00Z`).
-- enum 값은 DB와 같은 대문자다. (`SHARED/PRIVATE`, `RESTAURANT/CAFE/SIGHTSEEING/LODGING/SHOPPING/ETC`, `LIKE/PASS` ...)
+- enum 값은 DB와 같은 대문자다. (`SHARED/PERSONAL`, `RESTAURANT/CAFE/SIGHTSEEING/LODGING/SHOPPING/ETC`, `LIKE/PASS` ...)
 
 ## 1. 인증 방식
 
@@ -46,10 +46,8 @@
 | 409 | `TRIP_PERIOD_HAS_ITEMS` | 기간을 줄이면 지워지는 일정이 있음 (확인 필요) | `itemCount`, `lostDayCount` |
 | 409 | `PIN_COLOR_TAKEN` | 다른 멤버가 쓰는 색 | |
 | 404 | `MEMBER_NOT_FOUND` | 내보낼 멤버가 없음 | |
-| 404 | `PLACE_NOT_FOUND` | 카드 없음 (남의 나만 카드도 같은 응답) | |
-| 409 | `PLACE_DUPLICATE` | 이미 등록된 장소 | |
-| 409 | `PLACE_ALREADY_SHARED` | "이미 공동카드로 등록되어 있습니다" | |
-| 400 | `VOTE_NOT_ALLOWED` | 나만 카드에는 투표 불가 | |
+| 404 | `PLACE_NOT_FOUND` | 카드 없음 (다른 방의 카드도 같은 응답) | |
+| 409 | `PLACE_DUPLICATE` | 이 방에 이미 등록된 장소 (방마다 같은 장소는 1장) | |
 | 400 | `NOT_GOOGLE_MAPS_URL` | 구글맵 링크가 아님 | |
 | 422 | `PLACE_RESOLVE_FAILED` | 링크를 열지 못했거나 구글에서 그 장소를 찾지 못함 | |
 | 503 | `GOOGLE_KEY_MISSING` | 서버에 `GOOGLE_MAPS_API_KEY`가 없어 장소를 등록할 수 없음 | |
@@ -60,10 +58,9 @@
 | 409 | `SCHEDULE_DUPLICATE` | 같은 장소 중복 배치 (F4-20). 숙소는 2번까지 허용, 3번째부터 거절 | `conflict`: { `dayNo`, `startTime` } |
 | 409 | `SCHEDULE_GAP_MISMATCH` | 틈에 넣을 수 없는 시간 | |
 | 409 | `SCHEDULE_ORDER_INVALID` | 보낸 순서를 적용할 수 없음 (그 사이 일정이 바뀜, 시간 항목 순서가 틀림) | |
-| 400 | `SCHEDULE_PLACE_NOT_ALLOWED` | 공동 일정에 나만 카드를 넣으려 함 | |
 | 400 | `INVALID_DAY` | 여행 기간 밖의 Day | |
 | 400 | `INVALID_TIME_RANGE` | 종료가 시작보다 빠르거나 같음, 시작 없이 종료만 있음 | |
-| 400 | `SHARE_NOT_ALLOWED` | 공동 카드만 채팅에 공유 가능 | |
+| 400 | `SHARE_NOT_ALLOWED` | 이 방의 카드가 아님 | |
 | 409 | `CONFLICT` | 그 밖의 동시 변경 충돌 | |
 | 500 | `INTERNAL_ERROR` | 서버 오류 | |
 
@@ -122,7 +119,7 @@ Trip = {
 | PATCH | `/api/trips/{tripId}/members/me` | `{ pinColorNo }` | `Member` | `PIN_COLOR_TAKEN` |
 
 - 기간을 줄여서 사라지는 Day에 일정이 있으면 `TRIP_PERIOD_HAS_ITEMS`로 거절한다. 화면에서 확인을 받은 뒤 `deleteOutOfRangeItems: true`로 다시 보내면 그 항목을 지우고 수정한다.
-- 나가기/내보내기: 그 사람의 투표, 개인 일정, 나만 카드만 지운다. 공동 카드, 참고자료, 채팅은 남는다.
+- 나가기/내보내기: 그 사람의 투표, 개인 일정만 지운다. 장소 카드, 참고자료, 채팅은 남는다.
 - 재참여: 스스로 나간 사람은 초대코드로 다시 들어올 수 있다(핀 색 새로 배정, 개인 일정 새로 생성, 안 읽은 수 0부터). 내보내진 사람은 `KICKED_MEMBER`.
 - 초대코드는 대소문자를 가리지 않는다.
 
@@ -133,7 +130,7 @@ Place = {
   "id": 10, "tripId": 1, "placeKey": "ChIJ8T1GpMGOGGARDYGSgpooDWw",
   "name": "센소지", "nameEn": "Sensō-ji", "address": "...", "addressEn": "...", "area": "아사쿠사", "latitude": 35.714765, "longitude": 139.796655,
   "googleMapsUrl": "https://maps.app.goo.gl/...", "category": "SIGHTSEEING", "memo": null,
-  "visibility": "SHARED", "createdByUserId": 1,
+  "createdByUserId": 1,
   "votes": { "1": "LIKE", "2": "PASS" },
   "references": [ { "id": 5, "url": "https://...", "title": "후기", "memo": null, "addedByUserId": 2 } ],
   "createdAt": "..."
@@ -141,25 +138,24 @@ Place = {
 ```
 - `address`, `area`, `latitude`, `longitude`, `memo`는 `null`일 수 있다. 좌표가 없으면 지도에 표시하지 않는다.
 - 취향 상태(좋아요/패스/의견갈림/미평가)는 저장하지 않는다. `votes`와 현재 멤버 수로 화면이 계산한다. (`lib/domain/status.ts`)
-- 목록은 **공동 카드 전체 + 내 나만 카드**만 내려온다. 남의 나만 카드는 어떤 API로도 볼 수 없다.
+- 장소 카드는 모두 방의 멤버 모두가 함께 쓴다(공개 범위 구분 없음). 방마다 같은 장소(`placeKey`)는 1장이다.
+- 목록은 방의 카드 전체다. 누가 등록했든 멤버라면 수정/삭제/투표/참고자료 추가를 할 수 있다.
 
 | 메서드 | 경로 | 요청 | 응답 | 오류 |
 |---|---|---|---|---|
 | POST | `/api/places/resolve` | `{ url }` | `{ placeKey, name, nameEn, address, addressEn, area, latitude, longitude, googleMapsUrl, category }` | `NOT_GOOGLE_MAPS_URL`, `PLACE_RESOLVE_FAILED`, `GOOGLE_KEY_MISSING` |
 | GET | `/api/trips/{tripId}/places` | | `Place[]` | |
-| POST | `/api/trips/{tripId}/places` | `{ placeKey, name, nameEn?, address?, addressEn?, area?, latitude?, longitude?, googleMapsUrl, category, memo?, visibility? }` | 201 `Place` | `PLACE_DUPLICATE`, `NOT_GOOGLE_MAPS_URL` |
+| POST | `/api/trips/{tripId}/places` | `{ placeKey, name, nameEn?, address?, addressEn?, area?, latitude?, longitude?, googleMapsUrl, category, memo? }` | 201 `Place` | `PLACE_DUPLICATE`, `NOT_GOOGLE_MAPS_URL` |
 | GET | `/api/trips/{tripId}/places/{placeId}` | | `Place` | `PLACE_NOT_FOUND` |
 | GET | `/api/trips/{tripId}/places/{placeId}/google-info` | | `{ available, info: { rating, websiteUrl, weekdayHours[] } }` | `PLACE_NOT_FOUND` |
 | PATCH | `/api/trips/{tripId}/places/{placeId}` | `{ name, category, memo }` | `Place` | |
 | DELETE | `/api/trips/{tripId}/places/{placeId}` | | 204 (참고자료, 투표, 배치된 일정 항목도 삭제) | |
-| PUT | `/api/trips/{tripId}/places/{placeId}/vote` | `{ vote: "LIKE" \| "PASS" }` | `Place` | `VOTE_NOT_ALLOWED` |
+| PUT | `/api/trips/{tripId}/places/{placeId}/vote` | `{ vote: "LIKE" \| "PASS" }` | `Place` | |
 | DELETE | `/api/trips/{tripId}/places/{placeId}/vote` | | `Place` (투표 취소) | |
-| POST | `/api/trips/{tripId}/places/{placeId}/promote` | | `Place` (공동으로 올리기) | `PLACE_ALREADY_SHARED` |
 | POST | `/api/trips/{tripId}/places/{placeId}/references` | `{ url, title, memo? }` | 201 `Place` | |
 | PATCH | `/api/trips/{tripId}/places/{placeId}/references/{referenceId}` | `{ url, title, memo? }` | `Place` | `REFERENCE_NOT_FOUND` |
 | DELETE | `/api/trips/{tripId}/places/{placeId}/references/{referenceId}` | | `Place` | `REFERENCE_NOT_FOUND` |
 
-- `visibility`를 생략하면 `SHARED`. 공동에서 나만으로 되돌리는 API는 없다.
 - 링크 해석(`/api/places/resolve`)은 짧은 링크를 열어 긴 주소를 얻고, 거기서 검색어로 쓸 장소명과 핀 좌표를 뽑는다. 그 값으로 구글 Places API(Text Search)에서 장소를 찾아 `placeKey`(= **구글 장소 ID** `ChIJ...`), 이름·주소·지역명(한국어), 좌표, `category`를 모두 구글 값으로 채운다.
   - `nameEn`, `addressEn`은 같은 장소를 영어로 한 번 더 조회(Place Details, `languageCode=en`)해서 받은 값이다. 한국어 값과 같거나 받지 못하면 `null`. 등록할 때 그대로 보내면 `places.name_en`, `places.address_en`에 저장된다.
   - 서버에 `GOOGLE_MAPS_API_KEY`가 없으면 `GOOGLE_KEY_MISSING`, 구글에서 장소를 찾지 못하면 `PLACE_RESOLVE_FAILED`다. 링크에서 읽은 값만으로 대신 등록하지 않는다.
@@ -179,7 +175,7 @@ ScheduleItem = {
 ```
 - `scope`: `SHARED`(공동 일정, `ownerUserId` = null) / `PERSONAL`(개인 일정, `ownerUserId` = 주인).
 - `kind`: `PLACE`(장소 항목) / `MEMO`(메모 항목, `title` 있음).
-- `placeName`, `placeCategory`: 남의 나만 카드로 넣은 항목이어도 내려준다. (카드 자체는 열 수 없다)
+- `placeName`, `placeCategory`: 장소 항목의 장소명과 카테고리. 카드가 지워졌으면 null.
 - `startTime`이 null이면 시간 미정이고, 자리는 `anchorMinute`(-1 = 맨 위, null = 맨 아래, 그 외 = 바로 앞 시간 항목의 시작 분)와 `sortOrder`다. 화면 정렬은 `lib/domain/schedule.ts`의 `sortTimeline`과 같다.
 - 하이라이트: `lastChangedAt`이 `highlightSeconds` 안이면 `lastChangedByUserId`의 닉네임과 `lastChangeType`(`ADDED`/`MOVED`/`TIME_CHANGED`/`EDITED`)으로 강조한다.
 
@@ -188,7 +184,7 @@ ScheduleItem = {
 | 메서드 | 경로 | 요청 | 응답 | 오류 |
 |---|---|---|---|---|
 | GET | `/api/trips/{tripId}/schedule-items` | | `ScheduleItem[]` (공동 + 모든 멤버의 개인 일정) | |
-| POST | `/api/trips/{tripId}/schedules/{owner}/items` | `{ dayNo, placeId? , title?, startTime?, endTime?, memo?, index? }` | 201 `ScheduleItem` | `SCHEDULE_OVERLAP`, `SCHEDULE_DUPLICATE`, `SCHEDULE_GAP_MISMATCH`, `SCHEDULE_PLACE_NOT_ALLOWED`, `PLACE_NOT_FOUND`, `INVALID_DAY`, `INVALID_TIME_RANGE` |
+| POST | `/api/trips/{tripId}/schedules/{owner}/items` | `{ dayNo, placeId? , title?, startTime?, endTime?, memo?, index? }` | 201 `ScheduleItem` | `SCHEDULE_OVERLAP`, `SCHEDULE_DUPLICATE`, `SCHEDULE_GAP_MISMATCH`, `PLACE_NOT_FOUND`, `INVALID_DAY`, `INVALID_TIME_RANGE` |
 | PATCH | `/api/trips/{tripId}/schedule-items/{itemId}` | `{ startTime?, endTime?, memo?, title? }` | `ScheduleItem` | `SCHEDULE_OVERLAP`, `INVALID_TIME_RANGE` |
 | POST | `/api/trips/{tripId}/schedule-items/{itemId}/move` | `{ dayNo }` | `ScheduleItem` | `INVALID_DAY` |
 | DELETE | `/api/trips/{tripId}/schedule-items/{itemId}` | | 204 | |
@@ -261,9 +257,8 @@ ChatMessage = { "id": 55, "tripId": 1, "kind": "USER", "senderUserId": 2, "conte
 
 화면 반영 요령
 - `SCHEDULE_CHANGED`: `upserted`는 ID 기준으로 넣거나 바꾸고, `removedIds`는 지운다.
-- `MEMBER_REMOVED`: 그 사람의 투표, 개인 일정, 나만 카드가 서버에서 지워졌다. 방 정보, 장소 카드, 일정을 다시 불러오는 것이 가장 간단하다. 내가 대상이면 방 목록으로 나간다.
+- `MEMBER_REMOVED`: 그 사람의 투표, 개인 일정이 서버에서 지워졌다. 방 정보, 장소 카드, 일정을 다시 불러오는 것이 가장 간단하다. 내가 대상이면 방 목록으로 나간다.
 - `PLACE_DELETED`: 카드와 `removedItemIds`의 일정 항목을 지운다.
-- 나만 카드의 등록/수정/삭제는 방에 뿌리지 않는다. (요청한 사람은 응답으로 받는다)
 - 연결이 끊겼다 다시 붙으면 그 사이 이벤트를 놓쳤을 수 있으므로 방 데이터를 다시 불러온다.
 
 ## 10. 서버 확장 메모 (다음 단계)

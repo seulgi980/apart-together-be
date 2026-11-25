@@ -28,6 +28,7 @@ services:
       - ./db/refresh_tokens.sql:/docker-entrypoint-initdb.d/03-refresh_tokens.sql:ro
       - ./db/places_english.sql:/docker-entrypoint-initdb.d/04-places_english.sql:ro
       - ./db/schedule_items_lodging_slot.sql:/docker-entrypoint-initdb.d/05-schedule_items_lodging_slot.sql:ro
+      - ./db/shared_cards_redesign.sql:/docker-entrypoint-initdb.d/06-shared_cards_redesign.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
       interval: 10s

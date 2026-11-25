@@ -66,7 +66,7 @@ class RealtimeTest extends IntegrationTest {
 	@Test
 	@DisplayName("두 사용자가 같은 방에서 공동 일정 변경(SCHEDULE_CHANGED)과 시스템 메시지를 실시간으로 받는다")
 	void 두_사용자가_일정변경을_실시간으로_받는다() throws Exception {
-		long placeId = addPlace(jieun, tripId, "g-osaka", "오사카성", "SHARED");
+		long placeId = addPlace(jieun, tripId, "g-osaka", "오사카성");
 		try (StompTestClient a = StompTestClient.connect(port, jieun.token());
 				StompTestClient b = StompTestClient.connect(port, minsu.token())) {
 			var forJieun = a.subscribeTrip(tripId);
@@ -131,15 +131,13 @@ class RealtimeTest extends IntegrationTest {
 	}
 
 	@Test
-	@DisplayName("장소 카드, 투표, 멤버 변동도 이벤트 종류별로 온다. 나만 카드는 방에 뿌리지 않는다")
+	@DisplayName("장소 카드, 투표, 멤버 변동도 이벤트 종류별로 온다")
 	void 카드_투표_멤버_이벤트() throws Exception {
 		try (StompTestClient b = StompTestClient.connect(port, minsu.token())) {
 			var forMinsu = b.subscribeTrip(tripId);
 
-			addPlace(jieun, tripId, "g-secret", "비밀 장소", "PRIVATE");
-			long placeId = addPlace(jieun, tripId, "g-sensoji", "센소지", "SHARED");
+			long placeId = addPlace(jieun, tripId, "g-sensoji", "센소지");
 			JsonNode upserted = forMinsu.await("PLACE_UPSERTED");
-			// 먼저 만든 나만 카드는 오지 않고 공동 카드만 온다
 			assertThat(upserted.get("payload").get("name").asString()).isEqualTo("센소지");
 
 			api.put(jieun.token(), trip + "/places/" + placeId + "/vote", TestApi.json("vote", "LIKE"));

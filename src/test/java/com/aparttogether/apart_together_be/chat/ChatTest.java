@@ -81,19 +81,18 @@ class ChatTest extends IntegrationTest {
 	}
 
 	@Test
-	@DisplayName("[채팅] 장소 카드 공유는 같은 여행방의 공동(SHARED) 카드만 허용한다")
-	void 채팅_공동카드만_공유할수있다() {
-		long shared = addPlace(jieun, tripId, "g-sensoji", "센소지", "SHARED");
-		long mine = addPlace(jieun, tripId, "g-ramen", "라멘집", "PRIVATE");
+	@DisplayName("[채팅] 장소 카드 공유는 같은 여행방의 카드만 허용한다")
+	void 채팅_같은방카드만_공유할수있다() {
+		long shared = addPlace(jieun, tripId, "g-sensoji", "센소지");
 		long otherTrip = createTrip(minsu);
-		long otherPlace = addPlace(minsu, otherTrip, "g-other", "다른 방 장소", "SHARED");
+		long otherPlace = addPlace(minsu, otherTrip, "g-other", "다른 방 장소");
 
 		TestApi.Response ok = api.post(jieun.token(), chat + "/messages", TestApi.json("sharedPlaceId", shared));
 		assertThat(ok.status()).isEqualTo(201);
 		assertThat(ok.body().get("kind").asString()).isEqualTo("PLACE");
 		assertThat(ok.body().get("sharedPlaceId").asLong()).isEqualTo(shared);
 
-		assertThat(code(api.post(jieun.token(), chat + "/messages", TestApi.json("sharedPlaceId", mine))))
+		assertThat(code(api.post(jieun.token(), chat + "/messages", TestApi.json("sharedPlaceId", 999999))))
 				.isEqualTo("SHARE_NOT_ALLOWED");
 		assertThat(code(api.post(minsu.token(), chat + "/messages", TestApi.json("sharedPlaceId", otherPlace))))
 				.isEqualTo("SHARE_NOT_ALLOWED");
@@ -104,7 +103,7 @@ class ChatTest extends IntegrationTest {
 	@Test
 	@DisplayName("공유한 카드가 삭제되면 메시지는 남고 sharedPlaceId만 비어 '삭제된 장소 카드'로 표시할 수 있다 (F6-7)")
 	void sharedPlaceDeleted() {
-		long shared = addPlace(jieun, tripId, "g-sensoji", "센소지", "SHARED");
+		long shared = addPlace(jieun, tripId, "g-sensoji", "센소지");
 		api.post(jieun.token(), chat + "/messages", TestApi.json("sharedPlaceId", shared));
 		api.delete(jieun.token(), "/api/trips/" + tripId + "/places/" + shared);
 
