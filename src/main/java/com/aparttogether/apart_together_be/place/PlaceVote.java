@@ -18,7 +18,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/** 취향 투표 (F3). 공동 카드에만 있다. */
+/** 취향 투표 (F3). 모든 장소 카드에 투표할 수 있다. */
 @Entity
 @Table(name = "place_votes")
 @Getter
