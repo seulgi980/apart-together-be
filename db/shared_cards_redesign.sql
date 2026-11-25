@@ -107,3 +107,11 @@ ALTER TABLE schedule_items
     (place_id IS NOT NULL AND title IS NULL)
     OR (place_id IS NULL AND title IS NOT NULL)
   );
+
+-- ============================================================
+-- [3부] 영어 지역명: 카드에 "영어 (한국어)"로 지역명을 보여주기 위해 영어 지역명을 따로 둔다.
+--   * 장소 등록 때 구글에서 영어로 받은 짧은 지역명. 한국어 값과 같거나 받지 못하면 NULL.
+--   * 이미 등록된 카드는 NULL이다. (화면은 area만 보여준다)
+-- ============================================================
+ALTER TABLE places
+  ADD COLUMN area_en VARCHAR(50) NULL COMMENT '영어 지역명 (없으면 NULL)' AFTER area;

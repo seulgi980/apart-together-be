@@ -146,6 +146,7 @@ public class PlaceService {
 		place.setAddress(blankToNull(request.address()));
 		place.setAddressEn(blankToNull(request.addressEn()));
 		place.setArea(blankToNull(request.area()));
+		place.setAreaEn(blankToNull(request.areaEn()));
 		place.setLatitude(request.latitude());
 		place.setLongitude(request.longitude());
 		place.setGoogleMapsUrl(request.googleMapsUrl().trim());
@@ -314,7 +315,8 @@ public class PlaceService {
 						Collectors.mapping(ReferenceResponse::of, Collectors.toList())));
 		return list.stream()
 				.map(place -> new PlaceResponse(place.getId(), place.getTripId(), place.getPlaceKey(),
-						place.getName(), place.getNameEn(), place.getAddress(), place.getAddressEn(), place.getArea(), place.getLatitude(),
+						place.getName(), place.getNameEn(), place.getAddress(), place.getAddressEn(), place.getArea(), place.getAreaEn(),
+						place.getLatitude(),
 						place.getLongitude(), place.getGoogleMapsUrl(), place.getCategory().name(), place.getMemo(),
 						place.getCreatedByUserId(),
 						votesByPlace.getOrDefault(place.getId(), Map.of()),

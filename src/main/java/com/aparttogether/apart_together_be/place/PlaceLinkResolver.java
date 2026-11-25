@@ -27,7 +27,7 @@ import com.aparttogether.apart_together_be.common.ErrorCode;
  *     (공유 링크를 장소 ID로 바꿔 주는 구글 API는 없어서, 이 단계만 주소를 직접 읽는다)
  *  3) 장소명과 좌표로 구글 장소를 찾는다 (Places API Text Search).
  *     장소 ID, 이름, 주소, 지역명, 좌표, 카테고리는 모두 구글이 준 값을 쓴다. 장소 ID가 place_key(중복 판단 기준)다.
- *  4) 같은 장소를 영어로 한 번 더 조회해 영어 이름·주소를 받는다 (Place Details).
+ *  4) 같은 장소를 영어로 한 번 더 조회해 영어 이름·주소·지역명을 받는다 (Place Details).
  *
  * 구글 키가 없거나 구글에서 장소를 찾지 못하면 등록하지 않고 오류를 돌려준다.
  * (링크에서 읽은 값만으로 대신 등록하지 않는다)
@@ -36,11 +36,11 @@ import com.aparttogether.apart_together_be.common.ErrorCode;
 public class PlaceLinkResolver {
 
 	/**
-	 * nameEn, addressEn: 영어 이름과 주소. 한국어 값과 같거나 받지 못하면 null.
+	 * nameEn, addressEn, areaEn: 영어 이름, 주소, 지역명. 한국어 값과 같거나 받지 못하면 null.
 	 * category: 구글이 알려준 유형으로 고른 카테고리.
 	 */
 	public record ResolvedPlace(String placeKey, String name, String nameEn, String address, String addressEn, String area,
-			BigDecimal latitude, BigDecimal longitude, String googleMapsUrl, Place.Category category) {
+			String areaEn, BigDecimal latitude, BigDecimal longitude, String googleMapsUrl, Place.Category category) {
 	}
 
 	/** 긴 주소에서 뽑은 검색어(장소명)와 좌표 */
@@ -89,6 +89,7 @@ public class PlaceLinkResolver {
 				found.address(),
 				english == null ? null : differentFrom(english.address(), found.address()),
 				found.area(),
+				english == null ? null : differentFrom(english.area(), found.area()),
 				found.latitude(), found.longitude(), url,
 				found.category());
 	}

@@ -42,14 +42,17 @@ class PlaceTest extends IntegrationTest {
 	}
 
 	@Test
-	@DisplayName("영어 장소명과 영어 주소를 함께 저장하고 돌려준다. 보내지 않으면 비어 있다")
+	@DisplayName("영어 장소명, 영어 주소, 영어 지역명을 함께 저장하고 돌려준다. 보내지 않으면 비어 있다")
 	void english() {
 		var body = placeBody("g-sensoji", "센소지");
 		body.put("nameEn", "Sensō-ji");
 		body.put("addressEn", "2-chōme-3-1 Asakusa, Taito City, Tokyo");
+		body.put("areaEn", "Asakusa");
 		JsonNode created = api.post(jieun.token(), base, body).body();
 		assertThat(created.get("nameEn").asString()).isEqualTo("Sensō-ji");
 		assertThat(created.get("addressEn").asString()).isEqualTo("2-chōme-3-1 Asakusa, Taito City, Tokyo");
+		assertThat(created.get("areaEn").asString()).isEqualTo("Asakusa");
+		assertThat(created.get("area").asString()).isEqualTo("아사쿠사");
 		assertThat(jdbc.queryForObject("select name_en from places where id = ?", String.class,
 				created.get("id").asLong())).isEqualTo("Sensō-ji");
 
@@ -57,6 +60,7 @@ class PlaceTest extends IntegrationTest {
 		JsonNode place = api.get(jieun.token(), base + "/" + plain).body();
 		assertThat(place.get("nameEn").isNull()).isTrue();
 		assertThat(place.get("addressEn").isNull()).isTrue();
+		assertThat(place.get("areaEn").isNull()).isTrue();
 	}
 
 	@Test

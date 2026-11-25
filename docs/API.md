@@ -127,7 +127,7 @@ Trip = {
 ```json
 Place = {
   "id": 10, "tripId": 1, "placeKey": "ChIJ8T1GpMGOGGARDYGSgpooDWw",
-  "name": "센소지", "nameEn": "Sensō-ji", "address": "...", "addressEn": "...", "area": "아사쿠사", "latitude": 35.714765, "longitude": 139.796655,
+  "name": "센소지", "nameEn": "Sensō-ji", "address": "...", "addressEn": "...", "area": "아사쿠사", "areaEn": "Asakusa", "latitude": 35.714765, "longitude": 139.796655,
   "googleMapsUrl": "https://maps.app.goo.gl/...", "category": "SIGHTSEEING", "memo": null,
   "createdByUserId": 1,
   "votes": { "1": "LIKE", "2": "PASS" },
@@ -142,9 +142,9 @@ Place = {
 
 | 메서드 | 경로 | 요청 | 응답 | 오류 |
 |---|---|---|---|---|
-| POST | `/api/places/resolve` | `{ url }` | `{ placeKey, name, nameEn, address, addressEn, area, latitude, longitude, googleMapsUrl, category }` | `NOT_GOOGLE_MAPS_URL`, `PLACE_RESOLVE_FAILED`, `GOOGLE_KEY_MISSING` |
+| POST | `/api/places/resolve` | `{ url }` | `{ placeKey, name, nameEn, address, addressEn, area, areaEn, latitude, longitude, googleMapsUrl, category }` | `NOT_GOOGLE_MAPS_URL`, `PLACE_RESOLVE_FAILED`, `GOOGLE_KEY_MISSING` |
 | GET | `/api/trips/{tripId}/places` | | `Place[]` | |
-| POST | `/api/trips/{tripId}/places` | `{ placeKey, name, nameEn?, address?, addressEn?, area?, latitude?, longitude?, googleMapsUrl, category, memo? }` | 201 `Place` (채팅에 등록 알림도 남긴다) | `PLACE_DUPLICATE`, `NOT_GOOGLE_MAPS_URL` |
+| POST | `/api/trips/{tripId}/places` | `{ placeKey, name, nameEn?, address?, addressEn?, area?, areaEn?, latitude?, longitude?, googleMapsUrl, category, memo? }` | 201 `Place` (채팅에 등록 알림도 남긴다) | `PLACE_DUPLICATE`, `NOT_GOOGLE_MAPS_URL` |
 | GET | `/api/trips/{tripId}/places/{placeId}` | | `Place` | `PLACE_NOT_FOUND` |
 | GET | `/api/trips/{tripId}/places/{placeId}/google-info` | | `{ available, info: { rating, websiteUrl, weekdayHours[] } }` | `PLACE_NOT_FOUND` |
 | PATCH | `/api/trips/{tripId}/places/{placeId}` | `{ name, category, memo }` | `Place` | |
@@ -156,7 +156,8 @@ Place = {
 | DELETE | `/api/trips/{tripId}/places/{placeId}/references/{referenceId}` | | `Place` | `REFERENCE_NOT_FOUND` |
 
 - 링크 해석(`/api/places/resolve`)은 짧은 링크를 열어 긴 주소를 얻고, 거기서 검색어로 쓸 장소명과 핀 좌표를 뽑는다. 그 값으로 구글 Places API(Text Search)에서 장소를 찾아 `placeKey`(= **구글 장소 ID** `ChIJ...`), 이름·주소·지역명(한국어), 좌표, `category`를 모두 구글 값으로 채운다.
-  - `nameEn`, `addressEn`은 같은 장소를 영어로 한 번 더 조회(Place Details, `languageCode=en`)해서 받은 값이다. 한국어 값과 같거나 받지 못하면 `null`. 등록할 때 그대로 보내면 `places.name_en`, `places.address_en`에 저장된다.
+  - `nameEn`, `addressEn`, `areaEn`은 같은 장소를 영어로 한 번 더 조회(Place Details, `languageCode=en`)해서 받은 값이다. 한국어 값과 같거나 받지 못하면 `null`. 등록할 때 그대로 보내면 `places.name_en`, `places.address_en`, `places.area_en`에 저장된다.
+  - 화면은 지역명을 `영어 (한국어)`로 보여준다. 둘 중 하나만 있으면 있는 값만 보여준다.
   - 서버에 `GOOGLE_MAPS_API_KEY`가 없으면 `GOOGLE_KEY_MISSING`, 구글에서 장소를 찾지 못하면 `PLACE_RESOLVE_FAILED`다. 링크에서 읽은 값만으로 대신 등록하지 않는다.
 - 구글 정보(`google-info`)는 DB에 저장하지 않고 부를 때마다 구글에서 받아 온다. 키가 없거나 구글에서 못 찾으면 `available: false`이고 `info`의 값은 모두 비어 있다(화면은 빈 칸으로 보여준다). `weekdayHours`는 월요일부터의 요일별 문구다.
 

@@ -41,8 +41,8 @@ public class GooglePlacesClient {
 			BigDecimal longitude, Place.Category category) {
 	}
 
-	/** 같은 장소의 영어 이름과 주소. 없는 값은 null이다. */
-	public record EnglishText(String name, String address) {
+	/** 같은 장소의 영어 이름, 주소, 짧은 지역명. 없는 값은 null이다. */
+	public record EnglishText(String name, String address, String area) {
 	}
 
 	/**
@@ -112,14 +112,14 @@ public class GooglePlacesClient {
 		return send(request).flatMap(GooglePlacesClient::parseFound);
 	}
 
-	/** 장소 ID로 영어 이름과 주소를 받는다. 조회하지 못하면 빈 값. */
+	/** 장소 ID로 영어 이름, 주소, 지역명을 받는다. 조회하지 못하면 빈 값. */
 	public Optional<EnglishText> english(String placeId) {
 		if (!isEnabled()) {
 			return Optional.empty();
 		}
 		HttpRequest request = request(
 				"places/" + URLEncoder.encode(placeId, StandardCharsets.UTF_8) + "?languageCode=en",
-				"displayName,formattedAddress")
+				"displayName,formattedAddress,addressComponents")
 				.GET().build();
 		return send(request).map(GooglePlacesClient::parseEnglish);
 	}
@@ -196,7 +196,8 @@ public class GooglePlacesClient {
 
 	static EnglishText parseEnglish(JsonNode place) {
 		return new EnglishText(limit(text(place.path("displayName").path("text")), 200),
-				limit(text(place.path("formattedAddress")), 300));
+				limit(text(place.path("formattedAddress")), 300),
+				area(place.path("addressComponents")));
 	}
 
 	/** 주소 구성 요소에서 짧은 지역명을 고른다. 없으면 null. */

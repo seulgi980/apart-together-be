@@ -61,18 +61,23 @@ class GooglePlacesClientTest {
 	}
 
 	@Test
-	@DisplayName("영어로 받은 상세 응답에서 영어 이름과 주소를 뽑는다")
+	@DisplayName("영어로 받은 상세 응답에서 영어 이름, 주소, 지역명을 뽑는다")
 	void parseEnglish() {
 		GooglePlacesClient.EnglishText english = GooglePlacesClient.parseEnglish(json.readTree("""
 				{ "displayName": { "text": "Sensō-ji", "languageCode": "en" },
-				  "formattedAddress": "2-chōme-3-1 Asakusa, Taito City, Tokyo 111-0032, Japan" }
+				  "formattedAddress": "2-chōme-3-1 Asakusa, Taito City, Tokyo 111-0032, Japan",
+				  "addressComponents": [
+				    { "longText": "Taito City", "types": ["locality", "political"] },
+				    { "longText": "Asakusa", "types": ["sublocality_level_2", "sublocality", "political"] } ] }
 				"""));
 		assertThat(english.name()).isEqualTo("Sensō-ji");
 		assertThat(english.address()).isEqualTo("2-chōme-3-1 Asakusa, Taito City, Tokyo 111-0032, Japan");
+		assertThat(english.area()).isEqualTo("Asakusa");
 
 		GooglePlacesClient.EnglishText empty = GooglePlacesClient.parseEnglish(json.readTree("{}"));
 		assertThat(empty.name()).isNull();
 		assertThat(empty.address()).isNull();
+		assertThat(empty.area()).isNull();
 	}
 
 	@Test

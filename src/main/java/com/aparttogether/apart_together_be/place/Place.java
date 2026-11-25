@@ -58,6 +58,10 @@ public class Place {
 	@Column(length = 50)
 	private String area;
 
+	/** 영어 지역명. 없으면 null */
+	@Column(name = "area_en", length = 50)
+	private String areaEn;
+
 	@Column(precision = 9, scale = 6)
 	private BigDecimal latitude;
 

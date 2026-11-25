@@ -27,7 +27,8 @@
 --  * places_english.sql         : places.name_en, address_en
 --  * schedule_items_lodging_slot.sql : schedule_items.place_slot (숙소 2번 배치. 다음 파일에서 다시 지움)
 --  * shared_cards_redesign.sql  : 나만 카드 없앰(places.visibility, dedupe_owner_id 삭제, 같은 장소는 방마다 1장),
---                                 일정 중복 배치 허용(schedule_items.place_key, place_slot, uq_schedule_items_place 삭제)
+--                                 일정 중복 배치 허용(schedule_items.place_key, place_slot, uq_schedule_items_place 삭제),
+--                                 places.area_en(영어 지역명) 추가
 --  아래 테이블 설명 중 나만 카드(PRIVATE), dedupe_owner_id, schedule_items.place_key 이야기는 v3 당시 기준이다.
 -- ============================================================
 
