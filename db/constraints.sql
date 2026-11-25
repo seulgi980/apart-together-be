@@ -76,6 +76,7 @@ ALTER TABLE places
 
 -- 장소 항목은 장소 카드와 place_key가 있고 제목이 없다.
 -- 메모 항목은 장소 카드와 place_key가 없고 제목이 있다.
+-- (shared_cards_redesign.sql이 place_key 컬럼을 지우면서 이 CHECK를 place_key 없이 다시 만든다)
 ALTER TABLE schedule_items
   ADD CONSTRAINT ck_schedule_items_kind CHECK (
     (place_id IS NOT NULL AND place_key IS NOT NULL AND title IS NULL)
@@ -101,10 +102,8 @@ ALTER TABLE schedule_items
 --    - 종료시간이 없으면 시작 시각 한 점으로 본다.
 --    - 맞닿는 경우(13:00~14:00과 14:00~15:00)는 겹침이 아니다.
 --    - start_time이 NULL인 항목은 검사에서 제외하고, 시간을 입력하는 시점에 검사한다.
---  * 중복 배치 검증: 같은 장소는 한 일정에 1번만. 숙소(LODGING)는 체크인/체크아웃 때문에 2번까지. (F4-20)
---    서비스가 개수를 세서 막고, uq_schedule_items_place (schedule_id, place_key, place_slot) 유니크가
---    같은 번호가 두 번 들어가는 것을 막는다. 위반 시 거절 메시지로 변환한다. (db/schedule_items_lodging_slot.sql)
---  * 일정 항목을 만들 때 place_key는 places.place_key를 복사해서 넣는다. (메모 항목은 NULL)
+--  * 같은 장소를 한 일정에 몇 번이든 넣을 수 있다. 중복 배치 검사는 없다. (F4-20)
+--    (예전의 uq_schedule_items_place, place_key, place_slot은 shared_cards_redesign.sql에서 지웠다)
 --  * 방의 카드는 공동 일정, 개인 일정 어디에든 넣을 수 있다. 다른 방의 카드는 넣을 수 없다.
 --
 -- [타임라인 순서] (schedule_items.anchor_minute, sort_order)

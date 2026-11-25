@@ -11,7 +11,6 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -108,18 +107,8 @@ public class ScheduleService {
 			// 이 방의 카드면 공동 일정, 개인 일정 어디에든 넣을 수 있다
 			place = places.findByIdAndTripId(request.placeId(), tripId)
 					.orElseThrow(() -> new ApiException(ErrorCode.PLACE_NOT_FOUND));
-			// 중복 배치 검증: 기준은 카드가 아니라 장소(place_key)다 (F4-20)
-			// 숙소는 체크인/체크아웃 때문에 2번까지, 나머지는 1번만 넣을 수 있다.
-			List<ScheduleItem> placed = items.findByScheduleIdAndPlaceKey(schedule.getId(), place.getPlaceKey());
-			int limit = maxPlacements(place);
-			if (placed.size() >= limit) {
-				throw conflict(ErrorCode.SCHEDULE_DUPLICATE, placed.get(0));
-			}
+			// 같은 장소를 한 일정에 몇 번이든 넣을 수 있다 (F4-20). 시간 겹침만 검사한다.
 			item.setPlaceId(place.getId());
-			// 일정 항목을 만들 때 place_key는 places.place_key를 복사해서 넣는다
-			item.setPlaceKey(place.getPlaceKey());
-			// 비어 있는 가장 작은 번호(1, 2 ...)를 쓴다. 1번을 지웠다면 다음 배치가 1번을 다시 쓴다.
-			item.setPlaceSlot(freeSlot(placed, limit));
 		} else {
 			item.setTitle(requireTitle(request.title()));
 		}
@@ -149,12 +138,7 @@ public class ScheduleService {
 		}
 		// [하이라이트] 직접 추가한 항목만 표시한다. 자리값만 다시 매겨진 주변 항목(relaid)은 바꾸지 않는다.
 		item.markChanged(ScheduleItem.ChangeType.ADDED, userId);
-		try {
-			items.saveAndFlush(item);
-		} catch (DataIntegrityViolationException e) {
-			// uq_schedule_items_place 유니크 위반 -> 거절 메시지로 변환
-			throw new ApiException(ErrorCode.SCHEDULE_DUPLICATE);
-		}
+		items.saveAndFlush(item);
 		items.saveAllAndFlush(relaid);
 
 		String name = place != null ? place.getName() : item.getTitle();
@@ -387,23 +371,6 @@ public class ScheduleService {
 		where.put("dayNo", existing.getDayNo());
 		where.put("startTime", Times.format(existing.getStartTime()));
 		return new ApiException(code, Map.of("conflict", where));
-	}
-
-	/** 같은 장소를 한 일정에 넣을 수 있는 횟수. 숙소는 체크인/체크아웃으로 2번, 나머지는 1번. */
-	static int maxPlacements(Place place) {
-		return place.getCategory() == Place.Category.LODGING ? 2 : 1;
-	}
-
-	/** 이미 쓰인 place_slot을 피해 1부터 limit 중 비어 있는 가장 작은 번호 */
-	private static int freeSlot(List<ScheduleItem> placed, int limit) {
-		Set<Integer> used = placed.stream().map(ScheduleItem::getPlaceSlot).collect(Collectors.toSet());
-		for (int slot = 1; slot <= limit; slot++) {
-			if (!used.contains(slot)) {
-				return slot;
-			}
-		}
-		// placed.size() < limit을 먼저 확인했으므로 여기 오지 않는다
-		throw new ApiException(ErrorCode.SCHEDULE_DUPLICATE);
 	}
 
 	/** 맨 아래(anchor_minute = NULL) 시간 미정 항목들의 최대 sort_order + 1 */

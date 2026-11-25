@@ -55,7 +55,6 @@
 | 403 | `SCHEDULE_READ_ONLY` | 다른 멤버의 개인 일정은 읽기 전용 | |
 | 404 | `SCHEDULE_NOT_FOUND`, `SCHEDULE_ITEM_NOT_FOUND` | 일정/항목 없음 | |
 | 409 | `SCHEDULE_OVERLAP` | 시간 겹침 (F4-19) | `conflict`: { `dayNo`, `startTime` } |
-| 409 | `SCHEDULE_DUPLICATE` | 같은 장소 중복 배치 (F4-20). 숙소는 2번까지 허용, 3번째부터 거절 | `conflict`: { `dayNo`, `startTime` } |
 | 409 | `SCHEDULE_GAP_MISMATCH` | 틈에 넣을 수 없는 시간 | |
 | 409 | `SCHEDULE_ORDER_INVALID` | 보낸 순서를 적용할 수 없음 (그 사이 일정이 바뀜, 시간 항목 순서가 틀림) | |
 | 400 | `INVALID_DAY` | 여행 기간 밖의 Day | |
@@ -184,20 +183,21 @@ ScheduleItem = {
 | 메서드 | 경로 | 요청 | 응답 | 오류 |
 |---|---|---|---|---|
 | GET | `/api/trips/{tripId}/schedule-items` | | `ScheduleItem[]` (공동 + 모든 멤버의 개인 일정) | |
-| POST | `/api/trips/{tripId}/schedules/{owner}/items` | `{ dayNo, placeId? , title?, startTime?, endTime?, memo?, index? }` | 201 `ScheduleItem` | `SCHEDULE_OVERLAP`, `SCHEDULE_DUPLICATE`, `SCHEDULE_GAP_MISMATCH`, `PLACE_NOT_FOUND`, `INVALID_DAY`, `INVALID_TIME_RANGE` |
+| POST | `/api/trips/{tripId}/schedules/{owner}/items` | `{ dayNo, placeId? , title?, startTime?, endTime?, memo?, index? }` | 201 `ScheduleItem` | `SCHEDULE_OVERLAP`, `SCHEDULE_GAP_MISMATCH`, `PLACE_NOT_FOUND`, `INVALID_DAY`, `INVALID_TIME_RANGE` |
 | PATCH | `/api/trips/{tripId}/schedule-items/{itemId}` | `{ startTime?, endTime?, memo?, title? }` | `ScheduleItem` | `SCHEDULE_OVERLAP`, `INVALID_TIME_RANGE` |
 | POST | `/api/trips/{tripId}/schedule-items/{itemId}/move` | `{ dayNo }` | `ScheduleItem` | `INVALID_DAY` |
 | DELETE | `/api/trips/{tripId}/schedule-items/{itemId}` | | 204 | |
 | PUT | `/api/trips/{tripId}/schedules/{owner}/days/{dayNo}/order` | `{ orderedIds: [..], movedId }` | `ScheduleItem[]` (그 Day, 화면 순서) | `SCHEDULE_ORDER_INVALID` |
 
 - **추가**: `placeId`가 있으면 장소 항목, 없으면 메모 항목(`title` 필수, 30자).
+  - 같은 장소(카드)를 한 일정에 몇 번이든 넣을 수 있다. 시간이 겹치는 것만 `SCHEDULE_OVERLAP`으로 거절한다. (F4-20)
   - `index`를 주면 타임라인의 그 자리(0 = 맨 위)에 끼워 넣는다. `startTime`도 함께 주면 그 시간이 앞뒤 시간 항목 사이에 들어가야 한다.
   - `index`가 없고 `startTime`도 없으면 그 Day의 맨 아래 시간 미정으로 들어간다. ([+] 버튼)
 - **수정**: 보낸 키만 바꾼다. `startTime` 키가 있으면 시간 변경이다(`null`이면 시간 미정으로). 이때 `endTime`은 함께 보낸 값(없으면 null)으로 바뀐다. `title`은 메모 항목만.
   - 시간 → 시간 미정: 있던 자리에 남는다. 시간 미정 → 시간: 시간순 자리로 간다.
 - **Day 이동**: 시간이 초기화되고 옮겨 간 Day의 맨 아래 시간 미정으로 놓인다. 겹침 검증 없음.
 - **순서**: 그 Day의 모든 항목 ID를 화면 순서대로 보낸다. 시간 항목끼리는 시간순이어야 한다. `movedId`(끌어 옮긴 항목)만 "방금 이동됨"으로 표시된다.
-- 모든 변경은 일정 행을 잠근 트랜잭션에서 검증하므로, 동시에 들어온 요청은 먼저 저장된 것이 우선하고 늦은 요청은 `SCHEDULE_OVERLAP`/`SCHEDULE_DUPLICATE`로 거절된다.
+- 모든 변경은 일정 행을 잠근 트랜잭션에서 검증하므로, 동시에 들어온 요청은 먼저 저장된 것이 우선하고 늦은 요청은 `SCHEDULE_OVERLAP`으로 거절된다.
 - 공동 일정의 추가/시간 변경/Day 이동/제외는 채팅에 시스템 메시지를 남긴다. 개인 일정은 남기지 않는다.
 
 ## 8. 채팅 (F6)

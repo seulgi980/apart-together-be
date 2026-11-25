@@ -43,7 +43,6 @@ public enum ErrorCode {
 	SCHEDULE_NOT_FOUND(HttpStatus.NOT_FOUND, "일정을 찾을 수 없습니다."),
 	SCHEDULE_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "일정 항목을 찾을 수 없습니다."),
 	SCHEDULE_OVERLAP(HttpStatus.CONFLICT, "해당 시간에 이미 일정이 있습니다."),
-	SCHEDULE_DUPLICATE(HttpStatus.CONFLICT, "해당 카드가 이미 배치되어 있습니다."),
 	SCHEDULE_GAP_MISMATCH(HttpStatus.CONFLICT, "이 자리에는 넣을 수 없는 시간이에요."),
 	SCHEDULE_ORDER_INVALID(HttpStatus.CONFLICT, "일정이 바뀌어 순서를 적용할 수 없습니다. 다시 시도해 주세요."),
 	INVALID_DAY(HttpStatus.BAD_REQUEST, "여행 기간을 벗어난 Day입니다."),

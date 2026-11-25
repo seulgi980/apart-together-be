@@ -85,3 +85,25 @@ ALTER TABLE places
   DROP INDEX idx_places_trip_visibility,
   DROP COLUMN visibility,
   DROP COLUMN dedupe_owner_id;
+
+-- ============================================================
+-- [2부] 일정 배치 중복 허용: 같은 장소를 한 일정에 몇 번이든 넣을 수 있다. (시간 겹침 검사만 남는다)
+--   * 같은 장소 유니크(uq_schedule_items_place)와 place_slot(숙소 2번), place_key(복사본)를 지운다.
+--     카드가 방마다 1장이 되어서 일정 항목에 place_key를 따로 둘 이유도 없어졌다.
+--   * ck_schedule_items_kind는 place_key를 빼고 다시 만든다.
+-- ============================================================
+ALTER TABLE schedule_items
+  DROP CHECK ck_schedule_items_place_slot,
+  DROP CHECK ck_schedule_items_kind;
+
+ALTER TABLE schedule_items
+  DROP INDEX uq_schedule_items_place,
+  DROP COLUMN place_slot,
+  DROP COLUMN place_key;
+
+-- 장소 항목은 장소 카드가 있고 제목이 없다. 메모 항목은 장소 카드가 없고 제목이 있다.
+ALTER TABLE schedule_items
+  ADD CONSTRAINT ck_schedule_items_kind CHECK (
+    (place_id IS NOT NULL AND title IS NULL)
+    OR (place_id IS NULL AND title IS NOT NULL)
+  );

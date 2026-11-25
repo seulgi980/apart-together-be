@@ -249,62 +249,38 @@ class ScheduleTest extends IntegrationTest {
 	}
 
 	@Test
-	@DisplayName("[일정 검증] 중복 배치: 같은 장소는 한 일정에 한 번만. 다른 Day여도 거절한다 (F4-20)")
-	void 일정검증_중복배치를_거절한다() {
-		long shared = addPlace(jieun, tripId, "g-sensoji", "센소지");
+	@DisplayName("[일정 검증] 같은 장소를 한 일정에 몇 번이든 넣을 수 있다. 시간이 겹치는 것만 거절한다 (F4-20)")
+	void 일정검증_같은장소를_여러번_넣을수있다() {
+		long hotel = addPlace(jieun, tripId, "g-hotel", "아사쿠사 호텔");
 		String personal = String.valueOf(jieun.id());
-		assertThat(addPlaceItem(jieun, "shared", 3, shared, "13:00", null).status()).isEqualTo(201);
 
-		TestApi.Response rejected = addPlaceItem(minsu, "shared", 1, shared, null, null);
-		assertThat(rejected.status()).isEqualTo(409);
-		assertThat(code(rejected)).isEqualTo("SCHEDULE_DUPLICATE");
-		assertThat(rejected.body().get("message").asString()).isEqualTo("해당 카드가 이미 배치되어 있습니다.");
-		assertThat(rejected.body().get("conflict").get("dayNo").asInt()).isEqualTo(3);
-		assertThat(rejected.body().get("conflict").get("startTime").asString()).isEqualTo("13:00");
+		assertThat(addPlaceItem(jieun, "shared", 1, hotel, "15:00", null).status()).isEqualTo(201);
+		assertThat(addPlaceItem(minsu, "shared", 3, hotel, "11:00", null).status()).isEqualTo(201);
+		// 같은 Day에 시간만 다르게 또 넣을 수 있고, 시간 미정으로도 넣을 수 있다
+		assertThat(addPlaceItem(jieun, "shared", 1, hotel, "21:00", null).status()).isEqualTo(201);
+		assertThat(addPlaceItem(jieun, "shared", 2, hotel, null, null).status()).isEqualTo(201);
+		// 시간이 겹치면 같은 장소여도 시간 겹침으로 거절한다
+		TestApi.Response overlap = addPlaceItem(minsu, "shared", 1, hotel, "15:00", null);
+		assertThat(code(overlap)).isEqualTo("SCHEDULE_OVERLAP");
 
-		// 개인 일정은 별개의 일정이라 넣을 수 있다. 그 안에서는 다시 중복이다.
-		assertThat(addPlaceItem(jieun, personal, 1, shared, null, null).status()).isEqualTo(201);
-		assertThat(code(addPlaceItem(jieun, personal, 2, shared, null, null))).isEqualTo("SCHEDULE_DUPLICATE");
-		// 거절된 요청은 채팅에 기록하지 않는다 (F6-5)
-		assertThat(chatTexts()).hasSize(1);
+		assertThat(addPlaceItem(jieun, personal, 1, hotel, null, null).status()).isEqualTo(201);
+		assertThat(addPlaceItem(jieun, personal, 1, hotel, null, null).status()).isEqualTo(201);
+		assertThat(jdbc.queryForObject("select count(*) from schedule_items where place_id = ?", Integer.class, hotel))
+				.isEqualTo(6);
 	}
 
 	@Test
-	@DisplayName("[일정 검증] 숙소는 체크인/체크아웃 때문에 한 일정에 2번까지 배치할 수 있고, 3번째는 거절한다 (F4-20)")
-	void 일정검증_숙소는_두번까지_배치한다() {
-		TestApi.Response created = api.post(jieun.token(), "/api/trips/" + tripId + "/places",
-				placeBody("g-hotel", "아사쿠사 호텔").put("category", "LODGING"));
-		assertThat(created.status()).isEqualTo(201);
-		long hotel = created.body().get("id").asLong();
-
-		long checkIn = addPlaceItem(jieun, "shared", 1, hotel, "15:00", null).body().get("id").asLong();
-		long checkOut = addPlaceItem(jieun, "shared", 3, hotel, "11:00", null).body().get("id").asLong();
-		assertThat(row(checkIn).get("place_slot")).isEqualTo(1);
-		assertThat(row(checkOut).get("place_slot")).isEqualTo(2);
-
-		TestApi.Response third = addPlaceItem(minsu, "shared", 2, hotel, null, null);
-		assertThat(third.status()).isEqualTo(409);
-		assertThat(code(third)).isEqualTo("SCHEDULE_DUPLICATE");
-
-		// 체크인 항목을 빼면 비어 있는 1번 자리를 다시 쓴다
-		assertThat(api.delete(jieun.token(), trip + "/schedule-items/" + checkIn).status()).isEqualTo(204);
-		long again = addPlaceItem(jieun, "shared", 2, hotel, null, null).body().get("id").asLong();
-		assertThat(row(again).get("place_slot")).isEqualTo(1);
-	}
-
-	@Test
-	@DisplayName("[일정 검증] 일정 항목을 만들 때 place_key는 places.place_key를 복사해서 넣는다. 메모 항목은 NULL")
-	void 일정검증_place_key를_복사한다() {
+	@DisplayName("[일정 검증] 장소 항목은 place_id가 있고 제목이 없다. 메모 항목은 place_id가 없고 제목이 있다")
+	void 일정검증_장소항목과_메모항목() {
 		long placeId = addPlace(jieun, tripId, "g-sensoji", "센소지");
 		long placeItem = addPlaceItem(jieun, "shared", 1, placeId, null, null).body().get("id").asLong();
 		long memoItem = memo(1, "숙소 체크인", null, null);
 
-		assertThat(row(placeItem).get("place_key")).isEqualTo("g-sensoji");
+		assertThat(((Number) row(placeItem).get("place_id")).longValue()).isEqualTo(placeId);
 		// 시간은 현지 시각 그대로 저장한다 (시간대 변환 없음)
 		long timed = memo(2, "아침", "09:30", "11:00");
 		assertThat(jdbc.queryForObject("select concat(start_time, '~', end_time) from schedule_items where id = ?", String.class, timed)).isEqualTo("09:30:00~11:00:00");
 		assertThat(row(placeItem).get("title")).isNull();
-		assertThat(row(memoItem).get("place_key")).isNull();
 		assertThat(row(memoItem).get("place_id")).isNull();
 		assertThat(row(memoItem).get("title")).isEqualTo("숙소 체크인");
 	}

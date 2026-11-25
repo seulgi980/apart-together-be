@@ -53,18 +53,6 @@ public class ScheduleItem {
 	@Column(name = "place_id")
 	private Long placeId;
 
-	/** places.place_key 복사본. (schedule_id, place_key, place_slot) 유니크가 중복 배치를 막는다. */
-	@Column(name = "place_key", length = 200)
-	private String placeKey;
-
-	/**
-	 * 같은 장소를 이 일정에 몇 번째로 넣었는지 (1부터). 숙소가 아니면 항상 1.
-	 * 숙소는 체크인/체크아웃 때문에 2까지 쓴다. 메모 항목은 기본값 1.
-	 */
-	@JdbcTypeCode(SqlTypes.TINYINT)
-	@Column(name = "place_slot", nullable = false)
-	private int placeSlot = 1;
-
 	@Column(length = 30)
 	private String title;
 
