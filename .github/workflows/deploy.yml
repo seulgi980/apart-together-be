@@ -117,7 +117,7 @@ jobs:
           printf '%s' "$GHCR_TOKEN" | ssh -i ~/.ssh/deploy_key "$EC2_USER@$EC2_HOST" "
             set -e
             cd ~/apart-together
-            test -f .env || { echo '~/apart-together/.env 가 없습니다. deploy/README.md 6번을 보고 만들어 주세요.'; exit 1; }
+            test -f .env || { echo '~/apart-together/.env 가 없습니다. deploy/README.md 5-3 을 보고 만들어 주세요.'; exit 1; }
             docker login ghcr.io -u '$GHCR_USER' --password-stdin
             docker compose pull backend
             docker compose up -d mysql backend
