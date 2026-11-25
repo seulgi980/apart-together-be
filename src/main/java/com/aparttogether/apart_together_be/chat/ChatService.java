@@ -96,6 +96,7 @@ public class ChatService {
 	/**
 	 * [채팅] 시스템 메시지. 공동 일정이 바뀔 때와 장소 카드를 등록할 때 남긴다. (호출하는 쪽이 판단한다)
 	 * 변경과 같은 트랜잭션 안에서 저장되므로, 거절된 요청은 기록되지 않는다.
+	 * 알림일 뿐이라 안 읽은 수에는 세지 않는다. (countUnread)
 	 */
 	@Transactional
 	public void postSystem(Long tripId, Long actorUserId, String text) {
@@ -108,7 +109,6 @@ public class ChatService {
 	 */
 	@Transactional
 	public void postSystem(Long tripId, Long actorUserId, String text, Long placeId) {
-		Long lastBefore = messages.findLastId(tripId);
 		ChatMessage message = new ChatMessage();
 		message.setTripId(tripId);
 		message.setMessageType(ChatMessage.MessageType.SYSTEM);
@@ -116,26 +116,6 @@ public class ChatService {
 		message.setContent(text.length() > MAX_CONTENT_LENGTH ? text.substring(0, MAX_CONTENT_LENGTH) : text);
 		// 이벤트에는 일정을 바꾼 사람을 실어, 그 사람의 화면에서는 안 읽은 메시지로 세지 않게 한다
 		saveAndPublish(message, actorUserId);
-		markOwnSystemMessageRead(tripId, actorUserId, lastBefore, message.getId());
-	}
-
-	/**
-	 * 내가 한 일로 생긴 시스템 메시지는 나에게 안 읽은 메시지가 아니다 (카카오톡에서 내가 보낸 메시지처럼).
-	 * 시스템 메시지는 보낸 사람이 비어 있어 안 읽은 수 계산에서 걸러지지 않으므로, 읽은 위치를 직접 올린다.
-	 * 단, 이 메시지 바로 앞까지 다 읽은 상태일 때만 올린다. (그 사이 남이 보낸 안 읽은 메시지를 읽음 처리하지 않게)
-	 */
-	private void markOwnSystemMessageRead(Long tripId, Long actorUserId, Long lastBefore, Long messageId) {
-		if (actorUserId == null) {
-			return;
-		}
-		members.findByTripIdAndUserId(tripId, actorUserId).ifPresent(member -> {
-			long lastRead = member.getLastReadChatId() == null ? 0L : member.getLastReadChatId();
-			long before = lastBefore == null ? 0L : lastBefore;
-			if (lastRead >= before && lastRead < messageId) {
-				member.setLastReadChatId(messageId);
-				members.saveAndFlush(member);
-			}
-		});
 	}
 
 	private ChatMessageResponse saveAndPublish(ChatMessage message, Long actorUserId) {

@@ -21,11 +21,15 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
 			""")
 	List<ChatMessage> findPage(@Param("tripId") Long tripId, @Param("before") Long before, Pageable pageable);
 
-	/** 안 읽은 수: 마지막으로 읽은 메시지 뒤에 온, 남이 보낸 메시지(시스템 메시지 포함) */
+	/**
+	 * 안 읽은 수: 마지막으로 읽은 메시지 뒤에 온, 남이 보낸 말풍선 메시지(일반 메시지, 장소 카드 공유).
+	 * 시스템 알림("~를 추가했습니다" 등)은 읽음/안 읽음 대상이 아니다.
+	 */
 	@Query("""
 			select count(m) from ChatMessage m
 			where m.tripId = :tripId and m.id > :lastReadId
-			  and (m.senderUserId is null or m.senderUserId <> :userId)
+			  and m.messageType = 'USER'
+			  and m.senderUserId <> :userId
 			""")
 	long countUnread(@Param("tripId") Long tripId, @Param("lastReadId") long lastReadId,
 			@Param("userId") Long userId);

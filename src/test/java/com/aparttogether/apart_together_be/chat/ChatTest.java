@@ -113,13 +113,9 @@ class ChatTest extends IntegrationTest {
 		assertThat(notice.get("senderUserId").isNull()).isTrue();
 		assertThat(notice.get("content").asString()).isEqualTo("지은님이 센소지 장소 카드를 추가했습니다.");
 		assertThat(notice.get("sharedPlaceId").asLong()).isEqualTo(placeId);
-		// 등록한 사람이 아닌 멤버에게는 안 읽은 메시지로 센다
-		assertThat(api.get(minsu.token(), chat + "/unread").body().get("unreadCount").asLong()).isEqualTo(1);
-
-		// 내가 한 일로 생긴 알림은 나에게 안 읽은 메시지가 아니다 (내 읽은 위치가 그 알림까지 올라간다)
+		// 알림은 안 읽은 수에 세지 않는다 (누구에게도)
+		assertThat(api.get(minsu.token(), chat + "/unread").body().get("unreadCount").asLong()).isZero();
 		assertThat(api.get(jieun.token(), chat + "/unread").body().get("unreadCount").asLong()).isZero();
-		assertThat(api.get(jieun.token(), chat + "/unread").body().get("lastReadMessageId").asLong())
-				.isEqualTo(notice.get("id").asLong());
 
 		// 중복 등록으로 거절되면 알림도 남지 않는다
 		api.post(minsu.token(), "/api/trips/" + tripId + "/places", placeBody("g-sensoji", "센소지"));
@@ -127,15 +123,18 @@ class ChatTest extends IntegrationTest {
 	}
 
 	@Test
-	@DisplayName("[채팅] 내 시스템 메시지는 그 앞까지 다 읽었을 때만 읽은 위치를 올린다. 남이 보낸 안 읽은 메시지는 그대로 안 읽음이다")
-	void 채팅_내_시스템메시지와_남의_안읽은메시지() {
-		send(minsu, "민수가 먼저 보낸 메시지");
-		addPlace(jieun, tripId, "g-sensoji", "센소지");
+	@DisplayName("[채팅] 안 읽은 수는 말풍선 메시지(일반, 장소 카드 공유)만 센다. 시스템 알림은 세지 않는다")
+	void 채팅_시스템알림은_안읽은수에서_뺀다() {
+		send(minsu, "민수가 보낸 메시지");
+		long placeId = addPlace(minsu, tripId, "g-sensoji", "센소지");
+		api.post(minsu.token(), "/api/trips/" + tripId + "/schedules/shared/items",
+				TestApi.json("dayNo", 1, "placeId", placeId));
+		api.post(minsu.token(), chat + "/messages", TestApi.json("sharedPlaceId", placeId));
 
-		// 민수의 메시지를 아직 안 읽었으므로 읽은 위치를 건너뛰어 올리지 않는다
-		JsonNode unread = api.get(jieun.token(), chat + "/unread").body();
-		assertThat(unread.get("unreadCount").asLong()).isEqualTo(2);
-		assertThat(unread.get("lastReadMessageId").isNull()).isTrue();
+		// 일반 메시지 1 + 장소 카드 공유 1. 카드 등록 알림, 일정 추가 알림은 세지 않는다
+		assertThat(api.get(jieun.token(), chat + "/unread").body().get("unreadCount").asLong()).isEqualTo(2);
+		assertThat(api.get(jieun.token(), "/api/trips").body().get(0).get("unreadCount").asLong()).isEqualTo(2);
+		assertThat(api.get(minsu.token(), chat + "/unread").body().get("unreadCount").asLong()).isZero();
 	}
 
 	@Test

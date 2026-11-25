@@ -219,8 +219,7 @@ ChatMessage = { "id": 55, "tripId": 1, "kind": "USER", "senderUserId": 2, "conte
 | POST | `/api/trips/{tripId}/chat/read` | `{ lastReadMessageId? }` | `{ "unreadCount": 0, "lastReadMessageId": 55 }` | |
 
 - 메시지 조회: `messages`는 오래된 것부터. `before`가 없으면 가장 최근 쪽(기본 50개, 최대 100개). `hasMore`가 true면 첫 메시지의 `id`를 `before`로 넘겨 위쪽을 이어 불러온다.
-- 안 읽은 수: 마지막으로 읽은 메시지 뒤에 온, 남이 보낸 메시지(시스템 메시지 포함) 수. `read`에 `lastReadMessageId`를 생략하면 방의 마지막 메시지까지 읽은 것으로 한다.
-  - 내가 한 일(일정 변경, 카드 등록)로 생긴 시스템 메시지는 나에게 안 읽은 메시지가 아니다. 그 앞까지 다 읽은 상태였다면 서버가 내 읽은 위치를 그 메시지까지 올린다.
+- 안 읽은 수: 마지막으로 읽은 메시지 뒤에 온, 남이 보낸 말풍선 메시지(`USER`, `PLACE`) 수. 시스템 알림(`SYSTEM`)은 세지 않는다. `read`에 `lastReadMessageId`를 생략하면 방의 마지막 메시지까지 읽은 것으로 한다.
 - 전송은 REST로도, WebSocket으로도 할 수 있다. 어느 쪽이든 `CHAT_MESSAGE` 이벤트로 모두에게 전달된다.
 
 ## 9. 실시간 (WebSocket, STOMP) (F7)
