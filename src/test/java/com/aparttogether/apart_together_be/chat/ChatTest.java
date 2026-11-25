@@ -116,9 +116,26 @@ class ChatTest extends IntegrationTest {
 		// 등록한 사람이 아닌 멤버에게는 안 읽은 메시지로 센다
 		assertThat(api.get(minsu.token(), chat + "/unread").body().get("unreadCount").asLong()).isEqualTo(1);
 
+		// 내가 한 일로 생긴 알림은 나에게 안 읽은 메시지가 아니다 (내 읽은 위치가 그 알림까지 올라간다)
+		assertThat(api.get(jieun.token(), chat + "/unread").body().get("unreadCount").asLong()).isZero();
+		assertThat(api.get(jieun.token(), chat + "/unread").body().get("lastReadMessageId").asLong())
+				.isEqualTo(notice.get("id").asLong());
+
 		// 중복 등록으로 거절되면 알림도 남지 않는다
 		api.post(minsu.token(), "/api/trips/" + tripId + "/places", placeBody("g-sensoji", "센소지"));
 		assertThat(api.get(minsu.token(), chat + "/messages").body().get("messages")).hasSize(1);
+	}
+
+	@Test
+	@DisplayName("[채팅] 내 시스템 메시지는 그 앞까지 다 읽었을 때만 읽은 위치를 올린다. 남이 보낸 안 읽은 메시지는 그대로 안 읽음이다")
+	void 채팅_내_시스템메시지와_남의_안읽은메시지() {
+		send(minsu, "민수가 먼저 보낸 메시지");
+		addPlace(jieun, tripId, "g-sensoji", "센소지");
+
+		// 민수의 메시지를 아직 안 읽었으므로 읽은 위치를 건너뛰어 올리지 않는다
+		JsonNode unread = api.get(jieun.token(), chat + "/unread").body();
+		assertThat(unread.get("unreadCount").asLong()).isEqualTo(2);
+		assertThat(unread.get("lastReadMessageId").isNull()).isTrue();
 	}
 
 	@Test
