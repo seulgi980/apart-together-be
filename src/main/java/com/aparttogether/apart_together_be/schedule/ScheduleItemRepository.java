@@ -15,7 +15,8 @@ public interface ScheduleItemRepository extends JpaRepository<ScheduleItem, Long
 
 	List<ScheduleItem> findByScheduleIdAndDayNo(Long scheduleId, int dayNo);
 
-	Optional<ScheduleItem> findByScheduleIdAndPlaceKey(Long scheduleId, String placeKey);
+	/** 이 일정에 같은 장소가 이미 놓인 항목들 (숙소는 최대 2개, 나머지는 최대 1개) */
+	List<ScheduleItem> findByScheduleIdAndPlaceKey(Long scheduleId, String placeKey);
 
 	List<ScheduleItem> findByPlaceId(Long placeId);
 

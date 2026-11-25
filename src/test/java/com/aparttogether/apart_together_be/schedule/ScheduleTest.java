@@ -273,6 +273,29 @@ class ScheduleTest extends IntegrationTest {
 	}
 
 	@Test
+	@DisplayName("[일정 검증] 숙소는 체크인/체크아웃 때문에 한 일정에 2번까지 배치할 수 있고, 3번째는 거절한다 (F4-20)")
+	void 일정검증_숙소는_두번까지_배치한다() {
+		TestApi.Response created = api.post(jieun.token(), "/api/trips/" + tripId + "/places",
+				placeBody("g-hotel", "아사쿠사 호텔", "SHARED").put("category", "LODGING"));
+		assertThat(created.status()).isEqualTo(201);
+		long hotel = created.body().get("id").asLong();
+
+		long checkIn = addPlaceItem(jieun, "shared", 1, hotel, "15:00", null).body().get("id").asLong();
+		long checkOut = addPlaceItem(jieun, "shared", 3, hotel, "11:00", null).body().get("id").asLong();
+		assertThat(row(checkIn).get("place_slot")).isEqualTo(1);
+		assertThat(row(checkOut).get("place_slot")).isEqualTo(2);
+
+		TestApi.Response third = addPlaceItem(minsu, "shared", 2, hotel, null, null);
+		assertThat(third.status()).isEqualTo(409);
+		assertThat(code(third)).isEqualTo("SCHEDULE_DUPLICATE");
+
+		// 체크인 항목을 빼면 비어 있는 1번 자리를 다시 쓴다
+		assertThat(api.delete(jieun.token(), trip + "/schedule-items/" + checkIn).status()).isEqualTo(204);
+		long again = addPlaceItem(jieun, "shared", 2, hotel, null, null).body().get("id").asLong();
+		assertThat(row(again).get("place_slot")).isEqualTo(1);
+	}
+
+	@Test
 	@DisplayName("[일정 검증] 일정 항목을 만들 때 place_key는 places.place_key를 복사해서 넣는다. 메모 항목은 NULL")
 	void 일정검증_place_key를_복사한다() {
 		long placeId = addPlace(jieun, tripId, "g-sensoji", "센소지", "SHARED");

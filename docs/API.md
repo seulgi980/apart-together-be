@@ -57,7 +57,7 @@
 | 403 | `SCHEDULE_READ_ONLY` | 다른 멤버의 개인 일정은 읽기 전용 | |
 | 404 | `SCHEDULE_NOT_FOUND`, `SCHEDULE_ITEM_NOT_FOUND` | 일정/항목 없음 | |
 | 409 | `SCHEDULE_OVERLAP` | 시간 겹침 (F4-19) | `conflict`: { `dayNo`, `startTime` } |
-| 409 | `SCHEDULE_DUPLICATE` | 같은 장소 중복 배치 (F4-20) | `conflict`: { `dayNo`, `startTime` } |
+| 409 | `SCHEDULE_DUPLICATE` | 같은 장소 중복 배치 (F4-20). 숙소는 2번까지 허용, 3번째부터 거절 | `conflict`: { `dayNo`, `startTime` } |
 | 409 | `SCHEDULE_GAP_MISMATCH` | 틈에 넣을 수 없는 시간 | |
 | 409 | `SCHEDULE_ORDER_INVALID` | 보낸 순서를 적용할 수 없음 (그 사이 일정이 바뀜, 시간 항목 순서가 틀림) | |
 | 400 | `SCHEDULE_PLACE_NOT_ALLOWED` | 공동 일정에 나만 카드를 넣으려 함 | |

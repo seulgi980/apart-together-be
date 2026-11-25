@@ -3,7 +3,7 @@
 Java 17, Spring Boot 4, Spring Data JPA, MySQL 8, WebSocket(STOMP), JWT.
 
 - API 목록: [docs/API.md](docs/API.md)
-- 테이블: [db/schema.sql](db/schema.sql) → [db/constraints.sql](db/constraints.sql) → [db/refresh_tokens.sql](db/refresh_tokens.sql) → [db/places_english.sql](db/places_english.sql) 순서로 실행
+- 테이블: [db/schema.sql](db/schema.sql) → [db/constraints.sql](db/constraints.sql) → [db/refresh_tokens.sql](db/refresh_tokens.sql) → [db/places_english.sql](db/places_english.sql) → [db/schedule_items_lodging_slot.sql](db/schedule_items_lodging_slot.sql) 순서로 실행
 
 ## 로컬에서 실행
 
@@ -16,6 +16,7 @@ Java 17, Spring Boot 4, Spring Data JPA, MySQL 8, WebSocket(STOMP), JWT.
    SOURCE db/constraints.sql;
    SOURCE db/refresh_tokens.sql;
    SOURCE db/places_english.sql;
+   SOURCE db/schedule_items_lodging_slot.sql;
    ```
 
 2. 로컬 설정 파일을 만들고 실행한다. 비밀 값(DB 비밀번호, JWT 서명 키, 구글 키)은 코드에 없다.

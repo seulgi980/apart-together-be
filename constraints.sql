@@ -100,7 +100,9 @@ ALTER TABLE schedule_items
 --    - 종료시간이 없으면 시작 시각 한 점으로 본다.
 --    - 맞닿는 경우(13:00~14:00과 14:00~15:00)는 겹침이 아니다.
 --    - start_time이 NULL인 항목은 검사에서 제외하고, 시간을 입력하는 시점에 검사한다.
---  * 중복 배치 검증은 uq_schedule_items_place 유니크가 막는다. 위반 시 거절 메시지로 변환한다. (F4-20)
+--  * 중복 배치 검증: 같은 장소는 한 일정에 1번만. 숙소(LODGING)는 체크인/체크아웃 때문에 2번까지. (F4-20)
+--    서비스가 개수를 세서 막고, uq_schedule_items_place (schedule_id, place_key, place_slot) 유니크가
+--    같은 번호가 두 번 들어가는 것을 막는다. 위반 시 거절 메시지로 변환한다. (db/schedule_items_lodging_slot.sql)
 --  * 일정 항목을 만들 때 place_key는 places.place_key를 복사해서 넣는다. (메모 항목은 NULL)
 --  * 공동 일정에는 공동(SHARED) 카드만 넣을 수 있다.
 --    나만(PRIVATE) 카드는 투표 대상이 아니지만, 그 카드 주인의 개인 일정에는 넣을 수 있다.
