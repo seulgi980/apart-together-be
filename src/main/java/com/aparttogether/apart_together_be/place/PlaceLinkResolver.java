@@ -128,9 +128,15 @@ public class PlaceLinkResolver {
 					longitude = coordinate(coordinates.group(2));
 				}
 			} else if (name == null && !q.isBlank()) {
-				// 모바일 공유 링크: q=장소명, 주소
-				name = q.contains(",") ? q.substring(0, q.indexOf(',')).trim() : q.trim();
+				// 모바일 공유 링크: q=장소명 주소, 도시, ... (좌표가 없다)
+				// 장소명과 번지가 쉼표 없이 붙어 오기도 해서 자르면 도시가 빠진다. 좌표 대신 주소 전체를 단서로 쓴다.
+				name = q.trim();
 			}
+		}
+		// 카톡 미리보기 등이 바꾼 주소는 @0,0처럼 좌표가 비어 있다. 이런 값은 위치 힌트로 쓰지 않는다.
+		if (latitude != null && latitude.signum() == 0 && longitude.signum() == 0) {
+			latitude = null;
+			longitude = null;
 		}
 		if (latitude != null && (latitude.abs().compareTo(BigDecimal.valueOf(90)) > 0
 				|| longitude.abs().compareTo(BigDecimal.valueOf(180)) > 0)) {
