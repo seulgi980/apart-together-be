@@ -1,6 +1,7 @@
 package com.aparttogether.apart_together_be.chat;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -8,6 +9,9 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> {
+
+	/** 같은 사람이 같은 번호표로 이미 보낸 메시지 (재전송 중복 방지) */
+	Optional<ChatMessage> findBySenderUserIdAndClientMessageId(Long senderUserId, String clientMessageId);
 
 	/** 방의 마지막 메시지 ID. 메시지가 없으면 null. */
 	@Query("select max(m.id) from ChatMessage m where m.tripId = :tripId")

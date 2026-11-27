@@ -204,17 +204,19 @@ ScheduleItem = {
 ## 8. 채팅 (F6)
 
 ```json
-ChatMessage = { "id": 55, "tripId": 1, "kind": "USER", "senderUserId": 2, "content": "안녕", "sharedPlaceId": null, "createdAt": "..." }
+ChatMessage = { "id": 55, "tripId": 1, "kind": "USER", "senderUserId": 2, "content": "안녕", "sharedPlaceId": null, "clientMessageId": "6f1c...", "createdAt": "..." }
 ```
 - `kind`: `USER`(일반) / `SYSTEM`(공동 일정 변경, 장소 카드 등록 기록, `senderUserId` = null) / `PLACE`(장소 카드 공유, `content`는 빈 문자열).
 - 장소 카드 등록 알림(`SYSTEM`)은 `"OO님이 XX 장소 카드를 추가했습니다."`이고 `sharedPlaceId`에 그 카드 ID가 실린다. 이벤트는 알림(`CHAT_MESSAGE`)이 카드(`PLACE_UPSERTED`)보다 먼저 온다.
   화면은 이 알림을 받은 카드만 채팅 [+] 목록에 보여준다. (카드가 채팅 알림보다 먼저 공유되지 않게)
 - `kind`가 `PLACE`인데 `sharedPlaceId`가 null이면 카드가 삭제된 것이다("삭제된 장소 카드").
+- `clientMessageId`: 보낼 때 화면이 붙인 번호표(영문·숫자·하이픈 1~36자, 보통 UUID)를 그대로 돌려준다. 시스템 메시지와 번호표 없이 보낸 메시지는 null.
+  같은 사람이 같은 번호표로 다시 보내면(재전송) 새로 저장하지 않고 이미 저장된 메시지를 돌려주고 `CHAT_MESSAGE` 이벤트를 다시 보낸다.
 
 | 메서드 | 경로 | 요청 | 응답 | 오류 |
 |---|---|---|---|---|
 | GET | `/api/trips/{tripId}/chat/messages?before={id}&limit={n}` | | `{ "messages": ChatMessage[], "hasMore": true }` | |
-| POST | `/api/trips/{tripId}/chat/messages` | `{ content }` 또는 `{ sharedPlaceId }` | 201 `ChatMessage` | `VALIDATION_FAILED`, `SHARE_NOT_ALLOWED` |
+| POST | `/api/trips/{tripId}/chat/messages` | `{ content }` 또는 `{ sharedPlaceId }`, 둘 다 `clientMessageId?` | 201 `ChatMessage` | `VALIDATION_FAILED`, `SHARE_NOT_ALLOWED` |
 | GET | `/api/trips/{tripId}/chat/unread` | | `{ "unreadCount": 3, "lastReadMessageId": 52 }` | |
 | POST | `/api/trips/{tripId}/chat/read` | `{ lastReadMessageId? }` | `{ "unreadCount": 0, "lastReadMessageId": 55 }` | |
 
@@ -231,7 +233,8 @@ ChatMessage = { "id": 55, "tripId": 1, "kind": "USER", "senderUserId": 2, "conte
   - `/topic/trips/{tripId}`: 방의 모든 이벤트. 구독할 때 그 방의 ACTIVE 멤버인지 DB에서 확인한다. 아니면 ERROR 프레임과 함께 연결이 끊긴다.
   - `/user/queue/errors`: 내가 WebSocket으로 보낸 요청이 거절됐을 때 `{ code, message }`가 온다.
 - 전송
-  - `/app/trips/{tripId}/chat`: `{ "content": "..." }` 또는 `{ "sharedPlaceId": 10 }`
+  - `/app/trips/{tripId}/chat`: `{ "content": "..." }` 또는 `{ "sharedPlaceId": 10 }`, 둘 다 `"clientMessageId"`를 붙일 수 있다.
+    거절되면 `/user/queue/errors`로 `{ code, message, clientMessageId }`가 간다.
   - `/app/trips/{tripId}/presence`: `{ "day": 3 }` (지금 보고 있는 Day. Day를 바꿀 때와 구독 직후에 보낸다)
 - 현재 "보는 중" 상태: `GET /api/trips/{tripId}/presence` → `{ "viewers": [ { "userId": 1, "day": 3 } ] }`
 - access token이 연결 도중 만료돼도 연결은 유지된다. 다시 연결할 때는 새 access token을 CONNECT에 싣는다.

@@ -55,6 +55,10 @@ public class ChatMessage {
 	@Column(name = "shared_place_id")
 	private Long sharedPlaceId;
 
+	/** 보낸 화면이 붙인 메시지 ID (db/chat_client_message_id.sql). 시스템 메시지는 null */
+	@Column(name = "client_message_id", length = 36)
+	private String clientMessageId;
+
 	@Column(name = "created_at", nullable = false, updatable = false)
 	private Instant createdAt;
 

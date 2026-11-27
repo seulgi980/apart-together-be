@@ -57,6 +57,26 @@ class ChatTest extends IntegrationTest {
 	}
 
 	@Test
+	@DisplayName("번호표(clientMessageId)를 돌려주고, 같은 번호표로 다시 보내면 새로 저장하지 않는다 (재전송)")
+	void clientMessageIdRetry() {
+		String clientId = "6f1c2b9e-0000-4000-8000-000000000001";
+		TestApi.Response first = api.post(jieun.token(), chat + "/messages",
+				TestApi.json("content", "공항에서 만나", "clientMessageId", clientId));
+		assertThat(first.status()).isEqualTo(201);
+		assertThat(first.body().get("clientMessageId").asString()).isEqualTo(clientId);
+
+		TestApi.Response retry = api.post(jieun.token(), chat + "/messages",
+				TestApi.json("content", "공항에서 만나", "clientMessageId", clientId));
+		assertThat(retry.status()).isEqualTo(201);
+		assertThat(retry.body().get("id").asLong()).isEqualTo(first.body().get("id").asLong());
+		assertThat(api.get(jieun.token(), chat + "/messages").body().get("messages")).hasSize(1);
+
+		// 번호표 모양이 아니면 거절
+		assertThat(code(api.post(jieun.token(), chat + "/messages",
+				TestApi.json("content", "안녕", "clientMessageId", "<script>")))).isEqualTo("VALIDATION_FAILED");
+	}
+
+	@Test
 	@DisplayName("안 읽은 수: 남이 보낸 메시지만 세고, 읽음 처리하면 0이 된다 (F6-4)")
 	void unreadCount() {
 		send(jieun, "안녕");

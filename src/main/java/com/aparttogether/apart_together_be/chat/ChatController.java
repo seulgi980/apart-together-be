@@ -22,7 +22,7 @@ import com.aparttogether.apart_together_be.chat.ChatService.UnreadResponse;
 public class ChatController {
 
 	/** content: 일반 메시지 내용. sharedPlaceId: 장소 카드 공유일 때 (content는 무시한다) */
-	public record SendRequest(String content, Long sharedPlaceId) {
+	public record SendRequest(String content, Long sharedPlaceId, String clientMessageId) {
 	}
 
 	public record ReadRequest(Long lastReadMessageId) {
@@ -44,7 +44,8 @@ public class ChatController {
 	public ResponseEntity<ChatMessageResponse> send(@AuthenticationPrincipal AuthUser auth,
 			@PathVariable Long tripId, @RequestBody SendRequest request) {
 		return ResponseEntity.status(HttpStatus.CREATED)
-				.body(chatService.send(auth.id(), tripId, request.content(), request.sharedPlaceId()));
+				.body(chatService.send(auth.id(), tripId, request.content(), request.sharedPlaceId(),
+						request.clientMessageId()));
 	}
 
 	@GetMapping("/unread")

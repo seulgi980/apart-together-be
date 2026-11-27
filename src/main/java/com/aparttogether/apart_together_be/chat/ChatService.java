@@ -4,6 +4,8 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
+import java.util.regex.Pattern;
 
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -25,20 +27,24 @@ public class ChatService {
 	/** 메시지 최대 글자 수. 프론트 CHAT_MESSAGE_MAX와 같다. */
 	public static final int MAX_CONTENT_LENGTH = 20000;
 	private static final int MAX_PAGE_SIZE = 100;
+	/** 화면이 붙이는 메시지 번호표 모양 (UUID 등). 영문·숫자·하이픈 1~36자 */
+	private static final Pattern CLIENT_MESSAGE_ID = Pattern.compile("[A-Za-z0-9-]{1,36}");
 
 	/**
 	 * @param kind            USER(일반 메시지) / SYSTEM(공동 일정 변경, 장소 카드 등록 자동 기록) / PLACE(장소 카드 공유)
 	 * @param senderUserId    보낸 회원. SYSTEM은 null
 	 * @param sharedPlaceId   kind가 PLACE일 때 공유한 카드. 카드가 삭제됐으면 null ("삭제된 장소 카드")
+	 * @param clientMessageId 보낸 화면이 붙인 번호표. 보낸 사람 화면이 "전송 중" 말풍선을 이 메시지로 바꿀 때 쓴다
 	 */
 	public record ChatMessageResponse(Long id, Long tripId, String kind, Long senderUserId, String content,
-			Long sharedPlaceId, Instant createdAt) {
+			Long sharedPlaceId, String clientMessageId, Instant createdAt) {
 
 		static ChatMessageResponse of(ChatMessage message) {
 			String kind = message.getMessageType() == ChatMessage.MessageType.SYSTEM ? "SYSTEM"
 					: message.isPlaceShare() ? "PLACE" : "USER";
 			return new ChatMessageResponse(message.getId(), message.getTripId(), kind, message.getSenderUserId(),
-					message.getContent(), message.getSharedPlaceId(), message.getCreatedAt());
+					message.getContent(), message.getSharedPlaceId(), message.getClientMessageId(),
+					message.getCreatedAt());
 		}
 	}
 
@@ -69,11 +75,28 @@ public class ChatService {
 	/**
 	 * 메시지 전송. WebSocket(/app/trips/{tripId}/chat)과 REST 양쪽에서 부른다.
 	 * [채팅] 장소 카드 공유(shared_place_id)는 같은 여행방의 카드만 허용한다.
+	 *
+	 * @param clientMessageId 보낸 화면이 붙인 번호표 (없어도 된다). 같은 번호표로 이미 저장된 메시지가 있으면
+	 *                        ([재전송]인데 앞선 전송이 사실은 저장됐던 경우) 새로 저장하지 않고 그 메시지를 다시 알린다.
 	 */
 	@Transactional
-	public ChatMessageResponse send(Long userId, Long tripId, String content, Long sharedPlaceId) {
+	public ChatMessageResponse send(Long userId, Long tripId, String content, Long sharedPlaceId,
+			String clientMessageId) {
 		guard.requireActive(tripId, userId);
+		if (clientMessageId != null) {
+			if (!CLIENT_MESSAGE_ID.matcher(clientMessageId).matches()) {
+				throw new ApiException(ErrorCode.VALIDATION_FAILED);
+			}
+			Optional<ChatMessage> saved = messages.findBySenderUserIdAndClientMessageId(userId, clientMessageId);
+			if (saved.isPresent() && saved.get().getTripId().equals(tripId)) {
+				// 보낸 사람 화면이 확인을 받도록 다시 알린다. 다른 멤버 화면은 같은 id라 한 번만 보인다.
+				ChatMessageResponse response = ChatMessageResponse.of(saved.get());
+				events.publish(TripEvent.Type.CHAT_MESSAGE, tripId, userId, response);
+				return response;
+			}
+		}
 		ChatMessage message = new ChatMessage();
+		message.setClientMessageId(clientMessageId);
 		message.setTripId(tripId);
 		message.setSenderUserId(userId);
 		message.setMessageType(ChatMessage.MessageType.USER);

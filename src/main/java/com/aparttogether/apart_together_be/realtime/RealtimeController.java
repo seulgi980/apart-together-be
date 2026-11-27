@@ -33,11 +33,12 @@ import com.aparttogether.apart_together_be.trip.MembershipGuard;
  *  - /app/trips/{tripId}/chat      채팅 전송 { content } 또는 { sharedPlaceId }
  *  - /app/trips/{tripId}/presence  "지금 이 Day를 보는 중" { day }
  * 거절되면 보낸 사람의 /user/queue/errors 로 { code, message } 가 간다.
+ * 채팅이 거절되면 보낸 번호표도 { code, message, clientMessageId } 로 같이 간다.
  */
 @Controller
 public class RealtimeController {
 
-	public record ChatSend(String content, Long sharedPlaceId) {
+	public record ChatSend(String content, Long sharedPlaceId, String clientMessageId) {
 	}
 
 	public record PresenceUpdate(Integer day) {
@@ -62,7 +63,18 @@ public class RealtimeController {
 
 	@MessageMapping("/trips/{tripId}/chat")
 	public void chat(@DestinationVariable Long tripId, @Payload ChatSend message, Principal principal) {
-		chatService.send(userId(principal), tripId, message.content(), message.sharedPlaceId());
+		try {
+			chatService.send(userId(principal), tripId, message.content(), message.sharedPlaceId(),
+					message.clientMessageId());
+		} catch (ApiException e) {
+			// 거절 알림에 번호표를 실어, 보낸 화면이 어느 말풍선이 실패했는지 알 수 있게 한다
+			if (message.clientMessageId() == null) {
+				throw e;
+			}
+			Map<String, Object> details = new LinkedHashMap<>(e.details());
+			details.put("clientMessageId", message.clientMessageId());
+			throw new ApiException(e.code(), e.getMessage(), details);
+		}
 	}
 
 	@MessageMapping("/trips/{tripId}/presence")
