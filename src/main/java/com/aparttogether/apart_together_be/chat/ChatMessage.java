@@ -48,7 +48,8 @@ public class ChatMessage {
 	@Column(name = "message_type", nullable = false)
 	private MessageType messageType;
 
-	@Column(nullable = false, length = 2000)
+	/** MEDIUMTEXT (db/chat_long_messages.sql). 사용자 메시지는 ChatService.MAX_CONTENT_LENGTH(20000자)까지 */
+	@Column(nullable = false, columnDefinition = "MEDIUMTEXT")
 	private String content;
 
 	@Column(name = "shared_place_id")

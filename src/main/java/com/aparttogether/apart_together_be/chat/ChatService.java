@@ -22,7 +22,8 @@ import com.aparttogether.apart_together_be.trip.TripMemberRepository;
 @Service
 public class ChatService {
 
-	private static final int MAX_CONTENT_LENGTH = 2000;
+	/** 메시지 최대 글자 수. 프론트 CHAT_MESSAGE_MAX와 같다. */
+	public static final int MAX_CONTENT_LENGTH = 20000;
 	private static final int MAX_PAGE_SIZE = 100;
 
 	/**
@@ -86,7 +87,7 @@ public class ChatService {
 		} else {
 			String text = content == null ? "" : content.strip();
 			if (text.isEmpty() || text.length() > MAX_CONTENT_LENGTH) {
-				throw new ApiException(ErrorCode.VALIDATION_FAILED, "메시지는 1~2000자로 입력해 주세요.");
+				throw new ApiException(ErrorCode.VALIDATION_FAILED, "메시지는 1~" + MAX_CONTENT_LENGTH + "자로 입력해 주세요.");
 			}
 			message.setContent(text);
 		}

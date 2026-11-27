@@ -154,12 +154,14 @@ class ChatTest extends IntegrationTest {
 	}
 
 	@Test
-	@DisplayName("빈 메시지와 2000자를 넘는 메시지는 거절하고, 멤버가 아니면 채팅을 읽거나 쓸 수 없다")
+	@DisplayName("빈 메시지와 20000자를 넘는 메시지는 거절하고(20000자는 받는다), 멤버가 아니면 채팅을 읽거나 쓸 수 없다")
 	void validationAndPermission() {
 		assertThat(code(api.post(jieun.token(), chat + "/messages", TestApi.json("content", "   "))))
 				.isEqualTo("VALIDATION_FAILED");
-		assertThat(code(api.post(jieun.token(), chat + "/messages", TestApi.json("content", "가".repeat(2001)))))
+		assertThat(code(api.post(jieun.token(), chat + "/messages", TestApi.json("content", "가".repeat(20001)))))
 				.isEqualTo("VALIDATION_FAILED");
+		assertThat(api.post(jieun.token(), chat + "/messages", TestApi.json("content", "가".repeat(20000))).status())
+				.isEqualTo(201);
 
 		Member stranger = signup("남남");
 		assertThat(code(api.get(stranger.token(), chat + "/messages"))).isEqualTo("NOT_TRIP_MEMBER");
