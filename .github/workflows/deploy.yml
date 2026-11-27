@@ -104,7 +104,7 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy_key "$EC2_USER@$EC2_HOST" 'mkdir -p ~/apart-together/db'
           scp -i ~/.ssh/deploy_key deploy/docker-compose.yml deploy/nginx/apart-together.conf "$EC2_USER@$EC2_HOST:~/apart-together/"
-          scp -i ~/.ssh/deploy_key db/schema.sql db/constraints.sql db/refresh_tokens.sql db/places_english.sql db/schedule_items_lodging_slot.sql db/shared_cards_redesign.sql "$EC2_USER@$EC2_HOST:~/apart-together/db/"
+          scp -i ~/.ssh/deploy_key db/schema.sql db/constraints.sql db/refresh_tokens.sql db/places_english.sql db/schedule_items_lodging_slot.sql db/shared_cards_redesign.sql db/chat_long_messages.sql db/chat_client_message_id.sql "$EC2_USER@$EC2_HOST:~/apart-together/db/"
 
       - name: 새 이미지로 다시 띄우기
         env:

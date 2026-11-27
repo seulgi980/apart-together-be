@@ -29,6 +29,8 @@ services:
       - ./db/places_english.sql:/docker-entrypoint-initdb.d/04-places_english.sql:ro
       - ./db/schedule_items_lodging_slot.sql:/docker-entrypoint-initdb.d/05-schedule_items_lodging_slot.sql:ro
       - ./db/shared_cards_redesign.sql:/docker-entrypoint-initdb.d/06-shared_cards_redesign.sql:ro
+      - ./db/chat_long_messages.sql:/docker-entrypoint-initdb.d/07-chat_long_messages.sql:ro
+      - ./db/chat_client_message_id.sql:/docker-entrypoint-initdb.d/08-chat_client_message_id.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
       interval: 10s
